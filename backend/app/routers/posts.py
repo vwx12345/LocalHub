@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.comment import Comment
 from app.models.post import Post
 from app.schemas.post import (
     PostCreate,
@@ -48,6 +49,7 @@ def get_post(
         )
 
     post.views += 1
+
     db.commit()
     db.refresh(post)
 
@@ -131,7 +133,17 @@ def delete_post(
             detail="비밀번호가 일치하지 않습니다.",
         )
 
+    # 해당 게시글에 속한 일반 댓글과 대댓글을 모두 삭제
+    db.execute(
+        delete(Comment).where(
+            Comment.post_id == post_id,
+        )
+    )
+
+    # 게시글 삭제
     db.delete(post)
     db.commit()
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+    )

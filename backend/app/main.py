@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import health, posts
+from app.routers import health, posts, comments
 
 
 app = FastAPI(
@@ -31,6 +31,10 @@ app.include_router(
     prefix="/api",
 )
 
+app.include_router(
+    comments.router,
+    prefix="/api",
+)
 
 @app.get("/")
 def root() -> dict[str, str]:
