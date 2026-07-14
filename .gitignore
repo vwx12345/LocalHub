@@ -1,0 +1,70 @@
+# =========================
+# Frontend: Vue / Node.js
+# =========================
+
+node_modules/
+dist/
+coverage/
+
+# Vite 캐시
+.vite/
+
+# npm 로그
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Backend: Python / FastAPI
+# =========================
+
+.venv/
+venv/
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python 패키징
+build/
+*.egg-info/
+
+# 테스트 및 캐시
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# =========================
+# 환경변수
+# =========================
+
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+
+# =========================
+# SQLite
+# =========================
+
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# IDE
+# =========================
+
+.vscode/
+.idea/
+
+# =========================
+# 운영체제
+# =========================
+
+.DS_Store
+Thumbs.db
