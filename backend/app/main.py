@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.routers import health
+from app.chatbot.router import router as chatbot_router
 
 
 app = FastAPI(
@@ -23,6 +24,11 @@ app.add_middleware(
 
 app.include_router(
     health.router,
+    prefix="/api",
+)
+
+app.include_router(
+    chatbot_router,
     prefix="/api",
 )
 
