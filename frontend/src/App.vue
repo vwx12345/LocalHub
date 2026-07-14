@@ -1,11 +1,21 @@
 <script setup>
-import ChatBot from './components/chatbot/ChatBot.vue'
+import { ref } from 'vue'
+
+import ChatBotButton from './components/chatbot/ChatBotButton.vue'
+
+import ChatBotWindow from './components/chatbot/ChatBotWindow.vue'
+
+const isOpen = ref(false)
 </script>
 
 <template>
   <div>
-    <h1>챗봇 테스트</h1>
+    <h1>게시판 페이지</h1>
 
-    <ChatBot />
+    <p>게시판 영역</p>
+
+    <ChatBotWindow v-if="isOpen" />
+
+    <ChatBotButton @toggle="isOpen = !isOpen" />
   </div>
 </template>
