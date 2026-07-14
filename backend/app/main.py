@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import health, posts, comments
+from app.routers import health, posts, comments,place
 from app.chatbot.router import router as chatbot_router
 
 
@@ -16,7 +16,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -40,6 +40,10 @@ app.include_router(
 app.include_router(
     chatbot_router,
     prefix="/api",
+)
+
+app.include_router(
+    place.router
 )
 
 

@@ -14,6 +14,13 @@ const isOpen = ref(false)
 
     <p>게시판 영역</p>
 
+<nav>
+        <RouterLink to="/">Home</RouterLink>
+        <RouterLink to="/about">About</RouterLink>
+        <RouterLink to="/map">Map</RouterLink>
+      </nav>
+    </div>
+  </header>
     <ChatBotWindow v-if="isOpen" />
 
     <ChatBotButton @toggle="isOpen = !isOpen" />
