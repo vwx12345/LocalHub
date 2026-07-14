@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 
 import ChatBotButton from './components/chatbot/ChatBotButton.vue'
-
 import ChatBotWindow from './components/chatbot/ChatBotWindow.vue'
 
 const isOpen = ref(false)
@@ -14,13 +13,12 @@ const isOpen = ref(false)
 
     <p>게시판 영역</p>
 
-<nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-        <RouterLink to="/map">Map</RouterLink>
-      </nav>
-    </div>
-  </header>
+    <nav>
+      <RouterLink to="/">Home</RouterLink>
+      <RouterLink to="/about">About</RouterLink>
+      <RouterLink to="/map">Map</RouterLink>
+    </nav>
+
     <ChatBotWindow v-if="isOpen" />
 
     <ChatBotButton @toggle="isOpen = !isOpen" />
