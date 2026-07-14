@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.routers import health, posts, comments
+from app.chatbot.router import router as chatbot_router
 
 
 app = FastAPI(
@@ -35,6 +36,12 @@ app.include_router(
     comments.router,
     prefix="/api",
 )
+
+app.include_router(
+    chatbot_router,
+    prefix="/api",
+)
+
 
 @app.get("/")
 def root() -> dict[str, str]:

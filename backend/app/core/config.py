@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/localhub.db"
     frontend_origins: str = "http://localhost:5173"
     openai_api_key: str = ""
+    openai_model: str =""
 
     model_config = SettingsConfigDict(
         env_file=".env",
