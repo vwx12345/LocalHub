@@ -1,8 +1,8 @@
 # app/routers/place.py
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 import sqlite3
 from app.core.config import settings
-from pydantic import BaseModel # ⭐️ 리뷰 데이터 검증을 위해 추가
+from pydantic import BaseModel  # ⭐️ 리뷰 데이터 검증을 위해 추가
 
 router = APIRouter(
     prefix="/api",
@@ -17,33 +17,44 @@ class ReviewCreate(BaseModel):
     rating: int
     content: str
 
+# ⭐️ 리뷰 수정 시 넘어오는 데이터 양식 (비밀번호 확인 + 수정할 별점/내용)
+class ReviewUpdate(BaseModel):
+    password: str
+    rating: int
+    content: str
+
+# ⭐️ 리뷰 삭제 시 넘어오는 데이터 양식 (비밀번호 확인만 필요)
+class ReviewDelete(BaseModel):
+    password: str
+
+
 # 1. 통합 검색이 포함된 장소 조회 API
 @router.get("/places")
 def get_places(
-    type: str = Query(None), 
+    type: str = Query(None),
     keyword: str = Query(None)
 ):
     db_path = settings.database_url.replace("sqlite:///", "")
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     try:
         sql = "SELECT * FROM places WHERE 1=1"
         params = []
-        
+
         if type:
             sql += " AND type = ?"
             params.append(type)
-            
+
         if keyword:
             sql += " AND (title LIKE ? OR address LIKE ?)"
             params.append(f"%{keyword}%")
             params.append(f"%{keyword}%")
-            
+
         cursor.execute(sql, params)
         rows = cursor.fetchall()
-        
+
         result = []
         for row in rows:
             result.append({
@@ -70,13 +81,13 @@ def get_reviews(place_id: int):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     try:
         # 최신 리뷰가 맨 위로 오도록 내림차순(DESC) 정렬
         cursor.execute("SELECT id, nickname, rating, content, created_at FROM reviews WHERE place_id = ? ORDER BY id DESC", (place_id,))
         rows = cursor.fetchall()
         # 보안을 위해 password는 제외하고 프론트로 넘깁니다.
-        return [dict(row) for row in rows] 
+        return [dict(row) for row in rows]
     except Exception as e:
         print(f"❌ 리뷰 조회 실패: {e}")
         return {"error": str(e)}
@@ -89,7 +100,7 @@ def create_review(review: ReviewCreate):
     db_path = settings.database_url.replace("sqlite:///", "")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
+
     try:
         cursor.execute(
             "INSERT INTO reviews (place_id, nickname, password, rating, content) VALUES (?, ?, ?, ?, ?)",
@@ -100,5 +111,67 @@ def create_review(review: ReviewCreate):
     except Exception as e:
         print(f"❌ 리뷰 등록 실패: {e}")
         return {"error": str(e)}
+    finally:
+        conn.close()
+
+# ⭐️ 4. 리뷰 수정 API (비밀번호가 일치할 때만 수정 허용)
+@router.put("/reviews/{review_id}")
+def update_review(review_id: int, review: ReviewUpdate):
+    db_path = settings.database_url.replace("sqlite:///", "")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT password FROM reviews WHERE id = ?", (review_id,))
+        row = cursor.fetchone()
+
+        if row is None:
+            raise HTTPException(status_code=404, detail="리뷰를 찾을 수 없습니다.")
+
+        if row["password"] != review.password:
+            raise HTTPException(status_code=401, detail="비밀번호가 일치하지 않습니다.")
+
+        cursor.execute(
+            "UPDATE reviews SET rating = ?, content = ? WHERE id = ?",
+            (review.rating, review.content, review_id)
+        )
+        conn.commit()
+        return {"message": "리뷰가 수정되었습니다."}
+    except HTTPException:
+        # 위에서 던진 404 / 401은 그대로 응답으로 전달
+        raise
+    except Exception as e:
+        print(f"❌ 리뷰 수정 실패: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+# ⭐️ 5. 리뷰 삭제 API (비밀번호가 일치할 때만 삭제 허용)
+@router.delete("/reviews/{review_id}")
+def delete_review(review_id: int, review: ReviewDelete):
+    db_path = settings.database_url.replace("sqlite:///", "")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT password FROM reviews WHERE id = ?", (review_id,))
+        row = cursor.fetchone()
+
+        if row is None:
+            raise HTTPException(status_code=404, detail="리뷰를 찾을 수 없습니다.")
+
+        if row["password"] != review.password:
+            raise HTTPException(status_code=401, detail="비밀번호가 일치하지 않습니다.")
+
+        cursor.execute("DELETE FROM reviews WHERE id = ?", (review_id,))
+        conn.commit()
+        return {"message": "리뷰가 삭제되었습니다."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ 리뷰 삭제 실패: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()

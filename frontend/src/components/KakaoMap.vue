@@ -76,25 +76,63 @@
 
             <div v-for="rev in reviews" :key="rev.id" class="review-item">
               <div class="review-header">
-                <span class="review-author">{{ rev.nickname }}</span>
-                <span class="review-rating">{{ '⭐'.repeat(rev.rating) }}</span>
+                <div class="review-header-left">
+                  <span class="review-author">{{ rev.nickname }}</span>
+                  <span class="review-stars">
+                    <span v-for="n in 5" :key="n" class="star" :class="{ filled: n <= rev.rating }">★</span>
+                  </span>
+                </div>
+                <div class="review-actions" v-if="editingReviewId !== rev.id && deletingReviewId !== rev.id">
+                  <button class="action-btn" @click="startEditReview(rev)">수정</button>
+                  <button class="action-btn danger" @click="startDeleteReview(rev)">삭제</button>
+                </div>
               </div>
-              <p class="review-text">{{ rev.content }}</p>
-              <span class="review-date">{{ new Date(rev.created_at).toLocaleDateString() }}</span>
+
+              <!-- 일반 표시 모드 -->
+              <template v-if="editingReviewId !== rev.id">
+                <p class="review-text">{{ rev.content }}</p>
+                <span class="review-date">{{ new Date(rev.created_at).toLocaleDateString() }}</span>
+              </template>
+
+              <!-- 수정 모드 -->
+              <div v-else class="review-edit-box">
+                <div class="review-edit-top">
+                  <select v-model="editForm.rating" class="review-select">
+                    <option value="5">⭐⭐⭐⭐⭐</option>
+                    <option value="4">⭐⭐⭐⭐</option>
+                    <option value="3">⭐⭐⭐</option>
+                    <option value="2">⭐⭐</option>
+                    <option value="1">⭐</option>
+                  </select>
+                  <input v-model="actionPassword" type="password" placeholder="비밀번호 확인" class="review-input-small" />
+                </div>
+                <input v-model="editForm.content" type="text" class="review-input-main" placeholder="내용 수정" />
+                <div class="review-edit-buttons">
+                  <button class="action-btn" @click="cancelReviewAction">취소</button>
+                  <button class="review-submit-btn" @click="submitEditReview(rev)">저장</button>
+                </div>
+              </div>
+
+              <!-- 삭제 확인 모드 -->
+              <div v-if="deletingReviewId === rev.id" class="review-delete-confirm">
+                <input v-model="actionPassword" type="password" placeholder="비밀번호 입력 후 삭제" class="review-input-small" />
+                <button class="action-btn" @click="cancelReviewAction">취소</button>
+                <button class="action-btn danger" @click="confirmDeleteReview(rev)">삭제 확인</button>
+              </div>
             </div>
           </div>
 
           <div class="review-input-box">
+            <select v-model="reviewForm.rating" class="review-select">
+              <option value="5">⭐⭐⭐⭐⭐</option>
+              <option value="4">⭐⭐⭐⭐</option>
+              <option value="3">⭐⭐⭐</option>
+              <option value="2">⭐⭐</option>
+              <option value="1">⭐</option>
+            </select>
             <div class="review-inputs-top">
               <input v-model="reviewForm.nickname" type="text" placeholder="닉네임" class="review-input-small" />
               <input v-model="reviewForm.password" type="password" placeholder="비밀번호" class="review-input-small" />
-              <select v-model="reviewForm.rating" class="review-select">
-                <option value="5">⭐⭐⭐⭐⭐</option>
-                <option value="4">⭐⭐⭐⭐</option>
-                <option value="3">⭐⭐⭐</option>
-                <option value="2">⭐⭐</option>
-                <option value="1">⭐</option>
-              </select>
             </div>
             <div class="review-inputs-bottom">
               <input
@@ -133,8 +171,76 @@ const markers = ref([])
 let kakaoMap = null
 let hoverInfowindow = null
 
+// 선택된 마커 상태를 추적하기 위한 변수 (반응형 필요 없음, 지도 객체 직접 조작용)
+let selectedMarkerItem = null
+let selectedLabelOverlay = null
+
+// 타입별 기본 마커 색상 (뱃지 색상과 통일), 선택됐을 때 강조색
+const MARKER_COLORS = { restaurant: '#ff9800', tour: '#03a9f4' }
+const SELECTED_MARKER_COLOR = '#212121'
+
+// 색상을 넣어 핀 모양 SVG 마커 이미지를 만드는 헬퍼
+const createMarkerImage = (color, size = 36) => {
+  const { kakao } = window
+  const height = Math.round(size * 1.28)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${height}" viewBox="0 0 36 46">
+      <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 28 18 28s18-14.5 18-28C36 8.06 27.94 0 18 0z" fill="${color}"/>
+      <circle cx="18" cy="18" r="7" fill="#ffffff"/>
+    </svg>`
+  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg)
+  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(size, height), {
+    offset: new kakao.maps.Point(size / 2, height),
+  })
+}
+
+// 마커 하나의 강조 상태를 켜고 끄는 함수
+const setMarkerSelected = (markerItem, isSelected) => {
+  const image = isSelected ? createMarkerImage(SELECTED_MARKER_COLOR, 42) : markerItem.normalImage
+  markerItem.marker.setImage(image)
+}
+
+// 선택된 장소의 이름표를 마커 위에 계속 띄워두는 오버레이
+const showSelectedLabel = (markerItem) => {
+  const { kakao } = window
+  hideSelectedLabel()
+
+  const content = document.createElement('div')
+  content.innerText = markerItem.place.title
+  content.style.cssText = `
+    padding: 6px 12px;
+    background: ${SELECTED_MARKER_COLOR};
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 6px;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  `
+
+  selectedLabelOverlay = new kakao.maps.CustomOverlay({
+    content,
+    position: markerItem.marker.getPosition(),
+    yAnchor: 1.7, // 마커 핀 위쪽에 뜨도록
+    zIndex: 10,
+  })
+  selectedLabelOverlay.setMap(kakaoMap)
+}
+
+const hideSelectedLabel = () => {
+  if (selectedLabelOverlay) {
+    selectedLabelOverlay.setMap(null)
+    selectedLabelOverlay = null
+  }
+}
+
 const reviews = ref([])
 const reviewForm = ref({ nickname: '', password: '', rating: 5, content: '' })
+
+// 리뷰 수정/삭제 관련 상태
+const editingReviewId = ref(null)   // 지금 수정 폼이 열려있는 리뷰 id
+const deletingReviewId = ref(null)  // 지금 삭제 확인 폼이 열려있는 리뷰 id
+const actionPassword = ref('')      // 수정/삭제 시 입력하는 비밀번호
+const editForm = ref({ rating: 5, content: '' })
 
 onMounted(() => {
   const { kakao } = window
@@ -156,10 +262,12 @@ onMounted(() => {
       }
     })
 
-    await clickFilter('')
-
+    // ⭐️ clickFilter() 내부의 closeDetail()이 URL의 쿼리스트링을 지워버리기 때문에,
+    // clickFilter를 호출하기 "전에" place_id를 먼저 읽어서 변수에 저장해둡니다.
     const params = new URLSearchParams(window.location.search)
     const placeId = params.get('place_id')
+
+    await clickFilter('')
 
     if (placeId) {
       setTimeout(() => {
@@ -178,6 +286,10 @@ const loadDataFromServer = async (type, keyword) => {
     markers.value.forEach((m) => m.marker.setMap(null))
     markers.value = []
 
+    // 마커를 새로 로드하는 시점에는 기존에 선택했던 마커/라벨은 더 이상 유효하지 않으므로 초기화
+    selectedMarkerItem = null
+    hideSelectedLabel()
+
     const url = `http://localhost:8000/api/places?type=${type}&keyword=${keyword}`
     const response = await axios.get(url)
     const places = response.data
@@ -185,10 +297,16 @@ const loadDataFromServer = async (type, keyword) => {
     places.forEach((place) => {
       if (place.map_x && place.map_y) {
         const markerPosition = new kakao.maps.LatLng(place.map_y, place.map_x)
-        const marker = new kakao.maps.Marker({ position: markerPosition, title: place.title })
+        const normalImage = createMarkerImage(MARKER_COLORS[place.type] || '#555555')
+        const marker = new kakao.maps.Marker({
+          position: markerPosition,
+          title: place.title,
+          image: normalImage,
+        })
 
         marker.setMap(kakaoMap)
-        markers.value.push({ marker, place })
+        const markerItem = { marker, place, normalImage }
+        markers.value.push(markerItem)
 
         kakao.maps.event.addListener(marker, 'mouseover', () => {
           hoverInfowindow.setContent(`<div style="padding: 6px 12px; font-size: 12px; font-weight: bold;">${place.title}</div>`)
@@ -254,6 +372,82 @@ const submitReview = async () => {
   }
 }
 
+// ---------- 리뷰 수정 ----------
+const startEditReview = (rev) => {
+  editingReviewId.value = rev.id
+  deletingReviewId.value = null
+  actionPassword.value = ''
+  editForm.value = { rating: rev.rating, content: rev.content }
+}
+
+const submitEditReview = async (rev) => {
+  if (!actionPassword.value) {
+    alert('비밀번호를 입력해주세요!')
+    return
+  }
+  if (!editForm.value.content) {
+    alert('내용을 입력해주세요!')
+    return
+  }
+
+  try {
+    // ⭐️ 서버가 비밀번호를 대조해서, 일치할 때만 수정하도록 구현되어 있어야 합니다.
+    await axios.put(`http://localhost:8000/api/reviews/${rev.id}`, {
+      password: actionPassword.value,
+      rating: Number(editForm.value.rating),
+      content: editForm.value.content
+    })
+
+    // 서버 응답을 다시 받아와서 화면을 최신 상태로 갱신
+    await fetchReviews(activePlace.value.id)
+    cancelReviewAction()
+  } catch (error) {
+    console.error('❌ 리뷰 수정 실패:', error)
+    if (error.response && error.response.status === 401) {
+      alert('비밀번호가 일치하지 않습니다.')
+    } else {
+      alert('리뷰 수정에 실패했습니다.')
+    }
+  }
+}
+
+// ---------- 리뷰 삭제 ----------
+const startDeleteReview = (rev) => {
+  deletingReviewId.value = rev.id
+  editingReviewId.value = null
+  actionPassword.value = ''
+}
+
+const confirmDeleteReview = async (rev) => {
+  if (!actionPassword.value) {
+    alert('비밀번호를 입력해주세요!')
+    return
+  }
+
+  try {
+    // ⭐️ 서버가 비밀번호를 대조해서, 일치할 때만 삭제하도록 구현되어 있어야 합니다.
+    await axios.delete(`http://localhost:8000/api/reviews/${rev.id}`, {
+      data: { password: actionPassword.value }
+    })
+
+    reviews.value = reviews.value.filter((r) => r.id !== rev.id)
+    cancelReviewAction()
+  } catch (error) {
+    console.error('❌ 리뷰 삭제 실패:', error)
+    if (error.response && error.response.status === 401) {
+      alert('비밀번호가 일치하지 않습니다.')
+    } else {
+      alert('리뷰 삭제에 실패했습니다.')
+    }
+  }
+}
+
+const cancelReviewAction = () => {
+  editingReviewId.value = null
+  deletingReviewId.value = null
+  actionPassword.value = ''
+}
+
 // 장소를 선택하면 가운데 상세정보 패널이 열리고, 그만큼 지도 영역이 줄어듭니다.
 // 이때 kakaoMap.relayout()을 호출해줘야 지도가 잘린 것처럼 보이지 않고 새 크기에 맞게 다시 그려집니다.
 const selectPlace = (place) => {
@@ -263,7 +457,19 @@ const selectPlace = (place) => {
 
   window.history.replaceState(null, '', `?place_id=${place.id}`)
 
+  cancelReviewAction()
   fetchReviews(place.id)
+
+  // 마커 강조: 이전에 선택했던 마커는 원래 색으로 되돌리고, 새로 선택한 마커만 강조색 + 이름표 표시
+  const markerItem = markers.value.find((m) => m.place.id === place.id)
+  if (selectedMarkerItem && selectedMarkerItem !== markerItem) {
+    setMarkerSelected(selectedMarkerItem, false)
+  }
+  if (markerItem) {
+    setMarkerSelected(markerItem, true)
+    showSelectedLabel(markerItem)
+    selectedMarkerItem = markerItem
+  }
 
   nextTick(() => {
     kakaoMap.relayout()
@@ -278,6 +484,14 @@ const closeDetail = () => {
   isDetailOpen.value = false
   activePlace.value = null
   window.history.replaceState(null, '', window.location.pathname)
+  cancelReviewAction()
+
+  // 마커 강조/이름표 원상복구
+  if (selectedMarkerItem) {
+    setMarkerSelected(selectedMarkerItem, false)
+    selectedMarkerItem = null
+  }
+  hideSelectedLabel()
 
   nextTick(() => {
     kakaoMap.relayout()
@@ -443,16 +657,40 @@ const handleSearch = async () => {
 .review-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 15px; }
 .empty-review { font-size: 13px; color: #888; text-align: center; padding: 20px 0; }
 .review-item { background-color: #f9f9f9; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
-.review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-.review-author { font-size: 12px; font-weight: bold; color: #333; }
-.review-rating { font-size: 11px; }
+.review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; gap: 8px; }
+.review-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.review-author { font-size: 12px; font-weight: bold; color: #333; white-space: nowrap; }
+
+/* 별점: 5칸을 항상 보여주고 채워진 만큼 금색으로 강조 */
+.review-stars { display: inline-flex; gap: 1px; line-height: 1; flex-shrink: 0; }
+.star { font-size: 15px; color: #e0e0e0; }
+.star.filled { color: #ffb400; }
+
+.review-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.action-btn {
+  background: white; border: 1px solid #ddd; border-radius: 6px; padding: 4px 10px;
+  font-size: 11px; font-weight: 600; color: #555; cursor: pointer; transition: all 0.15s;
+}
+.action-btn:hover { background: #f0f0f0; }
+.action-btn.danger { color: #e53935; border-color: #ffcdd2; }
+.action-btn.danger:hover { background: #ffebee; }
+
 .review-text { font-size: 13px; color: #555; line-height: 1.5; margin: 0; }
 .review-date { font-size: 10px; color: #aaa; display: block; margin-top: 6px; text-align: right; }
+
+/* 리뷰 수정 인라인 폼 */
+.review-edit-box { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.review-edit-top { display: flex; gap: 6px; }
+.review-edit-buttons { display: flex; gap: 6px; justify-content: flex-end; margin-top: 2px; }
+
+/* 리뷰 삭제 확인 인라인 폼 */
+.review-delete-confirm { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.review-delete-confirm .review-input-small { flex: 1; }
 
 .review-input-box { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #eee; }
 .review-inputs-top { display: flex; gap: 6px; margin-bottom: 2px; }
 .review-input-small { flex: 1; padding: 8px; font-size: 12px; border: 1px solid #ddd; border-radius: 6px; outline: none; }
-.review-select { padding: 8px; font-size: 12px; border: 1px solid #ddd; border-radius: 6px; outline: none; background: white; cursor: pointer; }
+.review-select { width: 100%; padding: 10px; font-size: 14px; letter-spacing: 2px; border: 1px solid #ddd; border-radius: 6px; outline: none; background: white; cursor: pointer; box-sizing: border-box; }
 .review-inputs-bottom { display: flex; gap: 6px; }
 .review-input-main { flex: 1; padding: 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; outline: none; }
 .review-submit-btn { padding: 0 18px; background-color: #333; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
