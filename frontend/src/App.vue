@@ -10,9 +10,9 @@ const isOpen = ref(false)
 <template>
   <div class="app-wrapper">
     <header class="top-nav">
-      <div class="logo">
+      <RouterLink to="/" class="logo">
         <h2>LocalHub</h2>
-      </div>
+      </RouterLink>
       <nav class="nav-links">
         <RouterLink to="/">게시판(Home)</RouterLink>
         <RouterLink to="/about">About</RouterLink>
@@ -52,10 +52,24 @@ const isOpen = ref(false)
   z-index: 1000; /* 지도보다 무조건 위에 있도록 설정 */
 }
 
+.logo {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+
 .logo h2 {
   margin: 0;
   color: #1e88e5;
   font-weight: 900;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.logo:hover h2 {
+  color: #1976d2;
+  transform: translateY(-1px);
 }
 
 .nav-links {
