@@ -8,25 +8,34 @@ router = APIRouter(
     tags=["places"]
 )
 
-
-
 @router.get("/places")
-def get_places(type: str = Query(None, description="filter by 'restaurant' or 'tour'")):
-    # 디버깅용: 서버 터미널에 현재 읽으려는 DB 실제 경로를 찍어줍니다.
-    DB_PATH = settings.database_url.replace("sqlite:///","")
-    print(f"🔍 [DB 접근 경로]: {DB_PATH}")
-    
-    conn = sqlite3.connect(DB_PATH)
+def get_places(
+    type: str = Query(None), 
+    keyword: str = Query(None) # ⭐️ 검색어 파라미터 추가
+):
+    db_path = settings.database_url.replace("sqlite:///", "")
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
     try:
-        # ⭐️ 프론트에서 넘어오는 type 파라미터 조건 처리
+        # 1. 기본 뼈대가 되는 SQL 쿼리문
+        sql = "SELECT * FROM places WHERE 1=1"
+        params = []
+        
+        # 2. 카테고리(type)가 선택되었다면 조건 추가
         if type:
-            cursor.execute("SELECT * FROM places WHERE type = ?", (type,))
-        else:
-            cursor.execute("SELECT * FROM places")
+            sql += " AND type = ?"
+            params.append(type)
             
+        # 3. ⭐️ 검색어(keyword)가 입력되었다면 이름(title) 또는 주소(address)에서 검색
+        if keyword:
+            sql += " AND (title LIKE ? OR address LIKE ?)"
+            # 포함하는 단어를 찾기 위해 양옆에 %를 붙여줍니다. (예: "%칼국수%")
+            params.append(f"%{keyword}%")
+            params.append(f"%{keyword}%")
+            
+        cursor.execute(sql, params)
         rows = cursor.fetchall()
         
         result = []
@@ -41,13 +50,9 @@ def get_places(type: str = Query(None, description="filter by 'restaurant' or 't
                 "map_y": row["map_y"],
                 "type": row["type"]
             })
-            
         return result
-
-    except sqlite3.OperationalError as e:
-        # ⚠️ 만약 테이블이 없거나 DB 에러가 나면 터미널에 상세 내역을 출력합니다.
-        print(f"❌ SQLite 에러 발생: {e}")
+    except Exception as e:
+        print(f"❌ DB 조회 실패: {e}")
         return {"error": str(e)}
-        
     finally:
         conn.close()
