@@ -15,7 +15,6 @@ const isOpen = ref(false)
       </RouterLink>
       <nav class="nav-links">
         <RouterLink to="/">게시판(Home)</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
         <RouterLink to="/map">지도(Map)</RouterLink>
       </nav>
     </header>

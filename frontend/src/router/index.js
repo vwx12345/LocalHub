@@ -35,13 +35,6 @@ const router = createRouter({
       component: () => import('../views/PostDetailView.vue'),
     },
 
-    // 기존 페이지
-    {
-      path: '/about',
-      name: 'about',
-      component: () => import('../views/AboutView.vue'),
-    },
-
     {
       path: '/map',
       name: 'map',
