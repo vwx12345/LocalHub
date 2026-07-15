@@ -92,6 +92,55 @@ def get_reviews(place_id: int):
         return {"error": str(e)}
     finally:
         conn.close()
+        
+@router.get("/places/{place_id}")
+def get_place(place_id: int):
+    db_path = settings.database_url.replace("sqlite:///", "")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                content_id,
+                title,
+                address,
+                image_url,
+                map_x,
+                map_y,
+                type
+            FROM places
+            WHERE id = ?
+            """,
+            (place_id,),
+        )
+
+        row = cursor.fetchone()
+
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="장소를 찾을 수 없습니다.",
+            )
+
+        return dict(row)
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        print(f"❌ 장소 조회 실패: {e}")
+
+        raise HTTPException(
+            status_code=500,
+            detail="장소 정보를 불러오지 못했습니다.",
+        )
+
+    finally:
+        conn.close()
 
 # ⭐️ 3. 새로운 리뷰 등록 API
 @router.post("/reviews")

@@ -21,6 +21,10 @@ class Post(Base):
         default="free",
         server_default="free",
     )
+    place_id: Mapped[int | None] = mapped_column(
+         Integer,
+        nullable=True,
+    )   
 
     title: Mapped[str] = mapped_column(
         String(200),

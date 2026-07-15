@@ -1,4 +1,3 @@
-
 from datetime import datetime
 from typing import Literal
 
@@ -14,6 +13,7 @@ PostCategory = Literal[
 
 class PostCreate(BaseModel):
     category: PostCategory = "free"
+    place_id: int | None = None
 
     title: str = Field(
         min_length=1,
@@ -32,6 +32,7 @@ class PostCreate(BaseModel):
 
 class PostUpdate(BaseModel):
     category: PostCategory = "free"
+    place_id: int | None = None
 
     title: str = Field(
         min_length=1,
@@ -59,6 +60,7 @@ class PostResponse(BaseModel):
 
     id: int
     category: PostCategory
+    place_id: int | None
     title: str
     content: str
     views: int
