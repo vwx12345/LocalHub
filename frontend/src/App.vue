@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { RouterLink, RouterView } from 'vue-router'
 import ChatBotButton from './components/chatbot/ChatBotButton.vue'
 import ChatBotWindow from './components/chatbot/ChatBotWindow.vue'
 
@@ -17,6 +18,10 @@ const isOpen = ref(false)
         <RouterLink to="/map">Map</RouterLink>
       </nav>
     </header>
+
+    <main style="padding: 20px 0">
+      <RouterView />
+    </main>
 
     <ChatBotWindow v-if="isOpen" />
     <ChatBotButton @toggle="isOpen = !isOpen" />
