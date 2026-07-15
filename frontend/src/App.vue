@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 import ChatBotButton from './components/chatbot/ChatBotButton.vue'
 import ChatBotWindow from './components/chatbot/ChatBotWindow.vue'
+import { RouterLink, RouterView } from 'vue-router'
 
 const isOpen = ref(false)
 </script>
@@ -23,4 +24,5 @@ const isOpen = ref(false)
 
     <ChatBotButton @toggle="isOpen = !isOpen" />
   </div>
+  <RouterView />
 </template>
