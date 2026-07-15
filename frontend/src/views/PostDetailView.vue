@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { getPost, getComments, deletePost } from '../api/post'
+import { deletePost, getComments, getPost } from '../api/post'
 import CommentList from '../components/post/CommentList.vue'
 
 const route = useRoute()
@@ -10,20 +10,20 @@ const router = useRouter()
 
 const post = ref(null)
 const comments = ref([])
-
 const loading = ref(true)
-
-const error = ref(null)
+const error = ref('')
 
 const postId = route.params.id
 
 async function fetchData() {
   try {
     loading.value = true
+    error.value = ''
 
-    post.value = await getPost(postId)
+    const [postData, commentData] = await Promise.all([getPost(postId), getComments(postId)])
 
-    comments.value = await getComments(postId)
+    post.value = postData
+    comments.value = commentData
   } catch (err) {
     error.value = err.message
   } finally {
@@ -31,22 +31,37 @@ async function fetchData() {
   }
 }
 
+async function refreshComments() {
+  try {
+    comments.value = await getComments(postId)
+  } catch (err) {
+    alert(err.message)
+  }
+}
+
+function goList() {
+  router.push('/')
+}
+
 function goEdit() {
   router.push(`/posts/${postId}/edit`)
 }
 
 async function removePost() {
-  const password = prompt('게시글 비밀번호를 입력하세요')
+  const password = prompt('게시글 비밀번호를 입력하세요.')
 
-  if (!password) {
-    return
-  }
+  if (!password) return
+
+  const confirmed = confirm(
+    '게시글을 삭제하면 작성된 댓글도 함께 삭제됩니다.\n정말 삭제하시겠습니까?',
+  )
+
+  if (!confirmed) return
 
   try {
     await deletePost(postId, password)
 
-    alert('삭제되었습니다.')
-
+    alert('게시글이 삭제되었습니다.')
     router.push('/')
   } catch (err) {
     alert(err.message)
@@ -54,98 +69,223 @@ async function removePost() {
 }
 
 function formatDate(date) {
-  return new Date(date).toLocaleString()
+  if (!date) return ''
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(date))
 }
 
-onMounted(() => {
-  fetchData()
-})
+onMounted(fetchData)
 </script>
 
 <template>
-  <main class="detail-container">
-    <div v-if="loading">불러오는 중...</div>
+  <main class="detail-page">
+    <div class="detail-container">
+      <div v-if="loading" class="state-card">
+        <span>⏳</span>
+        <p>게시글을 불러오는 중입니다.</p>
+      </div>
 
-    <div v-else-if="error">
-      {{ error }}
-    </div>
+      <div v-else-if="error" class="state-card error-state">
+        <span>⚠️</span>
+        <p>{{ error }}</p>
 
-    <div v-else>
-      <section class="post">
-        <h1>
-          {{ post.title }}
-        </h1>
+        <button class="soft-button" @click="goList">목록으로 돌아가기</button>
+      </div>
 
-        <div class="meta">
-          조회수 {{ post.views }}
+      <template v-else>
+        <button class="back-button" @click="goList">← 게시판 목록</button>
 
-          |
+        <article class="post-card">
+          <header class="post-header">
+            <span class="category-badge">지역 이야기</span>
 
-          {{ formatDate(post.created_at) }}
-        </div>
+            <h1>{{ post.title }}</h1>
 
-        <hr />
+            <div class="meta">
+              <span>📅 {{ formatDate(post.created_at) }}</span>
+              <span>👁 조회 {{ post.views }}</span>
+            </div>
+          </header>
 
-        <p class="content">
-          {{ post.content }}
-        </p>
+          <div class="divider"></div>
 
-        <div class="actions">
-          <button @click="goEdit">수정</button>
+          <div class="post-content">
+            {{ post.content }}
+          </div>
 
-          <button class="delete" @click="removePost">삭제</button>
-        </div>
-      </section>
+          <footer class="post-actions">
+            <button class="soft-button" @click="goEdit">수정</button>
 
-      <CommentList :post-id="Number(postId)" :comments="comments" @refresh="fetchData" />
+            <button class="danger-button" @click="removePost">삭제</button>
+          </footer>
+        </article>
+
+        <CommentList :post-id="Number(postId)" :comments="comments" @refresh="refreshComments" />
+      </template>
     </div>
   </main>
 </template>
 
 <style scoped>
-.detail-container {
-  width: 80%;
-
-  margin: 40px auto;
+.detail-page {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  background: #f8f9fa;
 }
 
-.post {
-  padding: 20px;
+.detail-container {
+  width: min(900px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 34px 0 60px;
+}
+
+.back-button {
+  margin-bottom: 16px;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  color: #868e96;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.back-button:hover {
+  color: #212529;
+}
+
+.post-card {
+  padding: 34px;
+  background: #fff;
+  border: 1px solid #edf2f7;
+  border-radius: 18px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.04);
+}
+
+.category-badge {
+  display: inline-block;
+  margin-bottom: 14px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: #e7f5ff;
+  color: #228be6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.post-header h1 {
+  margin: 0;
+  color: #212529;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.35;
 }
 
 .meta {
-  color: #777;
-
-  margin: 10px 0;
-}
-
-.content {
-  min-height: 200px;
-
-  white-space: pre-line;
-}
-
-.actions {
-  margin-top: 30px;
-
   display: flex;
-
-  gap: 10px;
+  gap: 18px;
+  margin-top: 16px;
+  color: #868e96;
+  font-size: 13px;
 }
 
-button {
-  padding: 8px 16px;
+.divider {
+  height: 1px;
+  margin: 28px 0;
+  background: #f1f3f5;
+}
 
-  border: none;
+.post-content {
+  min-height: 230px;
+  color: #343a40;
+  font-size: 16px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
-  border-radius: 6px;
+.post-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 32px;
+}
 
+.soft-button,
+.danger-button {
+  padding: 9px 15px;
+  border: 1px solid transparent;
+  border-radius: 9px;
   cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  transition: all 0.2s ease;
 }
 
-.delete {
-  background: #e53935;
+.soft-button {
+  background: #f1f3f5;
+  color: #495057;
+}
 
-  color: white;
+.soft-button:hover {
+  background: #e9ecef;
+}
+
+.danger-button {
+  background: #fff5f5;
+  color: #fa5252;
+}
+
+.danger-button:hover {
+  background: #ffe3e3;
+}
+
+.state-card {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid #edf2f7;
+  border-radius: 18px;
+  color: #868e96;
+  text-align: center;
+}
+
+.state-card span {
+  font-size: 38px;
+}
+
+.error-state {
+  color: #fa5252;
+}
+
+@media (max-width: 650px) {
+  .detail-container {
+    width: min(100% - 24px, 900px);
+    padding-top: 22px;
+  }
+
+  .post-card {
+    padding: 24px 20px;
+  }
+
+  .post-header h1 {
+    font-size: 24px;
+  }
+
+  .meta {
+    flex-direction: column;
+    gap: 5px;
+  }
 }
 </style>
