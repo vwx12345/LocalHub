@@ -81,5 +81,6 @@ const isOpen = ref(false)
   flex-grow: 1;
   width: 100%;
   position: relative;
+  overflow: hidden; /* 추가: 자식이 넘칠 경우 스크롤/밀림 방지 */
 }
 </style>

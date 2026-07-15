@@ -1,54 +1,58 @@
 <template>
   <div class="map-layout">
-    
-    <div id="map" class="map-area"></div>
 
-    <div class="filter-bar">
-      <div class="filter-buttons">
-        <button @click="clickFilter('')" :class="['btn', { active: activeFilter === '' }]">전체보기</button>
-        <button @click="clickFilter('restaurant')" :class="['btn', 'btn-res', { active: activeFilter === 'restaurant' }]">🍔 맛집</button>
-        <button @click="clickFilter('tour')" :class="['btn', 'btn-tour', { active: activeFilter === 'tour' }]">🎯 관광지</button>
-      </div>
+    <!-- 1. 왼쪽: 검색 + 필터 + 리스트 패널 (항상 보임) -->
+    <div class="list-panel">
+      <div class="list-panel-header">
+        <div class="filter-buttons">
+          <button @click="clickFilter('')" :class="['btn', { active: activeFilter === '' }]">전체보기</button>
+          <button @click="clickFilter('restaurant')" :class="['btn', 'btn-res', { active: activeFilter === 'restaurant' }]">🍔 맛집</button>
+          <button @click="clickFilter('tour')" :class="['btn', 'btn-tour', { active: activeFilter === 'tour' }]">🎯 관광지</button>
+        </div>
 
-      <div class="search-box">
-        <input 
-          v-model="searchQuery" 
-          @keyup.enter="handleSearch" 
-          type="text" 
-          placeholder="역 이름, 지역, 랜드마크, 식당 검색" 
-          class="search-input"
-        />
-        <button @click="handleSearch" class="btn search-btn">🔍 검색</button>
-      </div>
-    </div>
-
-    <div class="sidebar" :class="{ 'is-open': isSidebarOpen }">
-      <button class="close-btn" @click="closeSidebar">✕</button>
-
-      <div v-if="sidebarMode === 'list'" class="sidebar-content">
-        <h3 class="list-title">📍 검색된 장소 목록 ({{ placeList.length }}건)</h3>
-        
-        <div class="list-container">
-          <div v-if="placeList.length === 0" class="empty-list">
-            이 주변에는 등록된 장소가 없습니다.<br>지도를 다른 곳으로 이동해보세요!
-          </div>
-          
-          <div v-for="p in placeList" :key="p.id" class="list-item" @click="selectPlace(p)">
-            <div class="list-item-img">
-              <img :src="p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400'" alt="썸네일"/>
-            </div>
-            <div class="list-item-info">
-              <span class="badge" :class="p.type">{{ p.type === 'restaurant' ? '🍔 맛집' : '🎯 관광지' }}</span>
-              <h4>{{ p.title }}</h4>
-              <p>{{ p.address }}</p>
-            </div>
-          </div>
+        <div class="search-box">
+          <input
+            v-model="searchQuery"
+            @keyup.enter="handleSearch"
+            type="text"
+            placeholder="역 이름, 지역, 랜드마크, 식당 검색"
+            class="search-input"
+          />
+          <button @click="handleSearch" class="btn search-btn">🔍</button>
         </div>
       </div>
 
-      <div v-else-if="sidebarMode === 'detail' && activePlace" class="sidebar-content">
-        <button class="back-btn" v-if="placeList.length > 1" @click="goToListMode">← 목록으로 돌아가기</button>
+      <h3 class="list-title">📍 검색된 장소 목록 ({{ placeList.length }}건)</h3>
 
+      <div class="list-container">
+        <div v-if="placeList.length === 0" class="empty-list">
+          이 주변에는 등록된 장소가 없습니다.<br>지도를 다른 곳으로 이동해보세요!
+        </div>
+
+        <div
+          v-for="p in placeList"
+          :key="p.id"
+          class="list-item"
+          :class="{ 'is-active': activePlace && activePlace.id === p.id && isDetailOpen }"
+          @click="selectPlace(p)"
+        >
+          <div class="list-item-img">
+            <img :src="p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400'" alt="썸네일"/>
+          </div>
+          <div class="list-item-info">
+            <span class="badge" :class="p.type">{{ p.type === 'restaurant' ? '🍔 맛집' : '🎯 관광지' }}</span>
+            <h4>{{ p.title }}</h4>
+            <p>{{ p.address }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 가운데: 클릭한 장소의 상세정보 사이드바 (선택 시에만 보임) -->
+    <div class="detail-panel" :class="{ 'is-open': isDetailOpen }" v-if="activePlace">
+      <button class="close-btn" @click="closeDetail">✕</button>
+
+      <div class="sidebar-content">
         <div class="place-image-box">
           <img :src="activePlace.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400'" class="place-image" />
         </div>
@@ -64,12 +68,12 @@
 
         <div class="review-section">
           <h3>💬 방문자 리뷰 ({{ reviews.length }})</h3>
-          
+
           <div class="review-list">
             <div v-if="reviews.length === 0" class="empty-review">
               아직 리뷰가 없습니다. 첫 리뷰를 남겨주세요!
             </div>
-            
+
             <div v-for="rev in reviews" :key="rev.id" class="review-item">
               <div class="review-header">
                 <span class="review-author">{{ rev.nickname }}</span>
@@ -79,7 +83,7 @@
               <span class="review-date">{{ new Date(rev.created_at).toLocaleDateString() }}</span>
             </div>
           </div>
-          
+
           <div class="review-input-box">
             <div class="review-inputs-top">
               <input v-model="reviewForm.nickname" type="text" placeholder="닉네임" class="review-input-small" />
@@ -93,12 +97,12 @@
               </select>
             </div>
             <div class="review-inputs-bottom">
-              <input 
-                v-model="reviewForm.content" 
-                @keyup.enter="submitReview" 
-                type="text" 
-                placeholder="솔직한 방문 후기를 남겨주세요!" 
-                class="review-input-main" 
+              <input
+                v-model="reviewForm.content"
+                @keyup.enter="submitReview"
+                type="text"
+                placeholder="솔직한 방문 후기를 남겨주세요!"
+                class="review-input-main"
               />
               <button @click="submitReview" class="review-submit-btn">등록</button>
             </div>
@@ -106,22 +110,26 @@
         </div>
       </div>
     </div>
+
+    <!-- 3. 오른쪽: 지도 (남은 공간을 모두 차지) -->
+    <div id="map" class="map-area"></div>
+
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, nextTick } from 'vue'
 import axios from 'axios'
 
-const isSidebarOpen = ref(false)
-const sidebarMode = ref('list') 
-const placeList = ref([])       
-const activePlace = ref(null)   
-const isBoundsUpdateActive = ref(true) 
+// 리스트 패널은 항상 열려있고, 상세정보 패널만 토글됩니다.
+const isDetailOpen = ref(false)
+const placeList = ref([])
+const activePlace = ref(null)
+const isBoundsUpdateActive = ref(true)
 
 const activeFilter = ref('')
-const searchQuery = ref('') 
-const markers = ref([]) 
+const searchQuery = ref('')
+const markers = ref([])
 let kakaoMap = null
 let hoverInfowindow = null
 
@@ -132,36 +140,34 @@ onMounted(() => {
   const { kakao } = window
   if (!kakao) return
 
-  kakao.maps.load(async () => { // ⭐️ async 추가
+  kakao.maps.load(async () => {
     const container = document.getElementById('map')
     const options = {
-      center: new kakao.maps.LatLng(36.3504119, 127.3845475), 
+      center: new kakao.maps.LatLng(36.3504119, 127.3845475),
       level: 6,
     }
     kakaoMap = new kakao.maps.Map(container, options)
-    
+
     hoverInfowindow = new kakao.maps.InfoWindow({ zIndex: 1, disableAutoPan: true })
 
     kakao.maps.event.addListener(kakaoMap, 'idle', () => {
-      if (isBoundsUpdateActive.value && sidebarMode.value === 'list') {
+      if (isBoundsUpdateActive.value) {
         updateVisibleList()
       }
     })
 
-    // ⭐️ 데이터 로딩을 완전히 기다린 후 URL 체크를 진행하도록 수정
-    await clickFilter('') 
+    await clickFilter('')
 
     const params = new URLSearchParams(window.location.search)
     const placeId = params.get('place_id')
-    
+
     if (placeId) {
-      // 마커 데이터가 생성될 때까지 아주 짧은 대기 (비동기 처리)
       setTimeout(() => {
         const targetMarker = markers.value.find(m => m.place.id === Number(placeId))
         if (targetMarker) {
           selectPlace(targetMarker.place)
         }
-      }, 300) // 마커 생성을 기다려주는 안전 장치
+      }, 300)
     }
   })
 })
@@ -208,14 +214,12 @@ const fetchReviews = async (placeId) => {
   }
 }
 
-// ⭐️ 즉각 반응형(Optimistic) 리뷰 등록 함수
 const submitReview = async () => {
   if (!reviewForm.value.nickname || !reviewForm.value.password || !reviewForm.value.content) {
     alert('닉네임, 비밀번호, 내용을 모두 입력해주세요!')
     return
   }
 
-  // 1. 방어 코드: reviews.value가 배열이 아니면 강제로 빈 배열로 초기화
   if (!Array.isArray(reviews.value)) {
     reviews.value = []
   }
@@ -227,9 +231,8 @@ const submitReview = async () => {
     content: reviewForm.value.content,
     created_at: new Date().toISOString()
   }
-  
-  // 이제 안전하게 unshift 사용 가능
-  reviews.value.unshift(tempReview) 
+
+  reviews.value.unshift(tempReview)
 
   const formData = { ...reviewForm.value }
   reviewForm.value = { nickname: '', password: '', rating: 5, content: '' }
@@ -242,38 +245,43 @@ const submitReview = async () => {
       rating: Number(formData.rating),
       content: formData.content
     })
-    
+
     fetchReviews(activePlace.value.id)
   } catch (error) {
     console.error('❌ 리뷰 등록 실패:', error)
-    // 에러 발생 시 아까 넣었던 임시 데이터 제거 (배열의 첫 번째 요소 제거)
-    reviews.value.shift() 
+    reviews.value.shift()
     alert('리뷰 등록에 실패했습니다.')
   }
 }
 
-// ⭐️ 선택 시 URL에 정보 남기기
+// 장소를 선택하면 가운데 상세정보 패널이 열리고, 그만큼 지도 영역이 줄어듭니다.
+// 이때 kakaoMap.relayout()을 호출해줘야 지도가 잘린 것처럼 보이지 않고 새 크기에 맞게 다시 그려집니다.
 const selectPlace = (place) => {
   const { kakao } = window
   activePlace.value = place
-  
-  // URL 주소창 뒤에 ?place_id=1 형태로 기록을 남깁니다. (새로고침 방지용)
+  isDetailOpen.value = true
+
   window.history.replaceState(null, '', `?place_id=${place.id}`)
 
-  sidebarMode.value = 'detail'
-  isSidebarOpen.value = true
-  
-  const target = new kakao.maps.LatLng(place.map_y, place.map_x)
-  kakaoMap.setLevel(4)
-  kakaoMap.panTo(target) 
-
   fetchReviews(place.id)
+
+  nextTick(() => {
+    kakaoMap.relayout()
+    const target = new kakao.maps.LatLng(place.map_y, place.map_x)
+    kakaoMap.setLevel(4)
+    kakaoMap.panTo(target)
+  })
 }
 
-// ⭐️ 목록 모드로 돌아갈 때 URL 파라미터 지우기
-const goToListMode = () => {
-  sidebarMode.value = 'list'
+// 상세정보 패널을 닫으면 지도 영역이 다시 넓어지므로 relayout이 필요합니다.
+const closeDetail = () => {
+  isDetailOpen.value = false
+  activePlace.value = null
   window.history.replaceState(null, '', window.location.pathname)
+
+  nextTick(() => {
+    kakaoMap.relayout()
+  })
 }
 
 const updateVisibleList = () => {
@@ -288,14 +296,13 @@ const updateVisibleList = () => {
 
 const clickFilter = async (type) => {
   activeFilter.value = type
-  searchQuery.value = '' 
+  searchQuery.value = ''
   await loadDataFromServer(type, '')
-  
-  isBoundsUpdateActive.value = true 
-  goToListMode() // 리스트 모드로 가면서 URL 초기화
-  isSidebarOpen.value = true
-  
-  setTimeout(updateVisibleList, 100) 
+
+  isBoundsUpdateActive.value = true
+  closeDetail()
+
+  setTimeout(updateVisibleList, 100)
 }
 
 const handleSearch = async () => {
@@ -310,20 +317,19 @@ const handleSearch = async () => {
   const dbPlaces = await loadDataFromServer(activeFilter.value, kw)
 
   if (dbPlaces.length === 1) {
-    selectPlace(dbPlaces[0])
-    isBoundsUpdateActive.value = false 
+    isBoundsUpdateActive.value = false
     placeList.value = dbPlaces
-  } 
+    selectPlace(dbPlaces[0])
+  }
   else if (dbPlaces.length > 1) {
     const target = new kakao.maps.LatLng(dbPlaces[0].map_y, dbPlaces[0].map_x)
     kakaoMap.setLevel(4)
     kakaoMap.panTo(target)
-    
+
     placeList.value = dbPlaces
-    goToListMode()
-    isSidebarOpen.value = true
-    isBoundsUpdateActive.value = false 
-  } 
+    closeDetail()
+    isBoundsUpdateActive.value = false
+  }
   else {
     if (!kakao.maps.services) return
     const ps = new kakao.maps.services.Places()
@@ -331,15 +337,14 @@ const handleSearch = async () => {
     ps.keywordSearch(kw, async (data, status) => {
       if (status === kakao.maps.services.Status.OK) {
         const target = new kakao.maps.LatLng(data[0].y, data[0].x)
-        kakaoMap.setLevel(4) 
+        kakaoMap.setLevel(4)
         kakaoMap.panTo(target)
 
         await loadDataFromServer(activeFilter.value, '')
-        
-        isBoundsUpdateActive.value = true 
-        goToListMode()
-        isSidebarOpen.value = true
-        
+
+        isBoundsUpdateActive.value = true
+        closeDetail()
+
         setTimeout(updateVisibleList, 300)
       } else {
         alert("검색 결과가 없습니다.")
@@ -347,68 +352,115 @@ const handleSearch = async () => {
     })
   }
 }
-
-const closeSidebar = () => {
-  isSidebarOpen.value = false
-  window.history.replaceState(null, '', window.location.pathname) // URL 파라미터 초기화
-}
 </script>
 
 <style scoped>
-.map-layout { position: relative; width: 100%; height: calc(100vh - 100px); background-color: #f5f5f5; overflow: hidden; }
-.map-area { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-.filter-bar { position: absolute; top: 20px; left: 20px; z-index: 10; display: flex; gap: 15px; align-items: center; }
-.filter-buttons, .search-box { display: flex; gap: 8px; }
-.search-input { padding: 10px 18px; border-radius: 30px; border: 1px solid #e0e0e0; outline: none; font-size: 13px; width: 220px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); transition: all 0.2s; }
-.search-input:focus { border-color: #333; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
-.btn { padding: 10px 18px; border-radius: 30px; border: none; background-color: white; color: #444; cursor: pointer; font-weight: bold; font-size: 13px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); transition: all 0.2s ease; }
-.btn:hover { background-color: #f9f9f9; transform: translateY(-2px); }
+.map-layout {
+  position: relative;
+  width: 100%;
+  height: 100%; /* 부모(main-content)가 이미 헤더 높이를 뺀 나머지 공간을 계산해줌 */
+  background-color: #f5f5f5;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+}
+
+/* ---------- 1. 리스트 패널 (왼쪽, 항상 보임) ---------- */
+.list-panel {
+  width: 360px;
+  flex-shrink: 0;
+  height: 100%;
+  background-color: white;
+  border-right: 1px solid #eee;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.list-panel-header {
+  padding: 20px 20px 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.filter-buttons { display: flex; gap: 8px; }
+.search-box { display: flex; gap: 8px; }
+.search-input { flex: 1; padding: 10px 16px; border-radius: 30px; border: 1px solid #e0e0e0; outline: none; font-size: 13px; transition: all 0.2s; }
+.search-input:focus { border-color: #333; }
+.btn { padding: 10px 16px; border-radius: 30px; border: none; background-color: #f2f2f2; color: #444; cursor: pointer; font-weight: bold; font-size: 13px; transition: all 0.2s ease; white-space: nowrap; }
+.btn:hover { background-color: #e8e8e8; }
 .btn.active { background-color: #333; color: white; }
 .btn-res.active { background-color: #ff9800; color: white; }
 .btn-tour.active { background-color: #03a9f4; color: white; }
-.search-btn:hover { background-color: #f0f0f0; }
+.search-btn { flex-shrink: 0; padding: 10px 14px; background-color: #333; color: white; }
+.search-btn:hover { background-color: #444; }
 
-.sidebar { position: absolute; top: 0; right: 0; width: 380px; height: 100%; background-color: white; z-index: 50; box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-.sidebar.is-open { transform: translateX(0); }
-.sidebar-content { padding: 24px; height: 100%; overflow-y: auto; display: flex; flex-direction: column; }
-.close-btn { position: absolute; top: 16px; right: 16px; background: white; border: 1px solid #ddd; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-weight: bold; color: #666; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 60; }
-
-.back-btn { background: none; border: none; color: #1e88e5; font-weight: bold; cursor: pointer; text-align: left; padding: 0; margin-bottom: 20px; font-size: 14px; }
-.back-btn:hover { text-decoration: underline; }
-.list-title { font-size: 16px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+.list-title { font-size: 14px; font-weight: bold; margin: 16px 20px 12px 20px; padding-bottom: 12px; border-bottom: 1px solid #eee; flex-shrink: 0; }
+.list-container { flex: 1; overflow-y: auto; padding: 0 20px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
 .empty-list { font-size: 13px; color: #888; text-align: center; padding: 40px 0; line-height: 1.6; }
-.list-container { display: flex; flex-direction: column; gap: 12px; }
-.list-item { display: flex; gap: 12px; padding: 12px; border: 1px solid #eee; border-radius: 12px; cursor: pointer; transition: background 0.2s; align-items: center;}
+.list-item { display: flex; gap: 12px; padding: 12px; border: 1px solid #eee; border-radius: 12px; cursor: pointer; transition: background 0.2s; align-items: center; }
 .list-item:hover { background: #f9f9f9; border-color: #ccc; }
-.list-item-img { width: 70px; height: 70px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.list-item.is-active { background: #f2f7ff; border-color: #90caf9; }
+.list-item-img { width: 60px; height: 60px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
 .list-item-img img { width: 100%; height: 100%; object-fit: cover; }
-.list-item-info { display: flex; flex-direction: column; gap: 4px; }
-.list-item-info h4 { margin: 0; font-size: 15px; font-weight: 800; color: #222; }
-.list-item-info p { margin: 0; font-size: 12px; color: #666; }
+.list-item-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.list-item-info h4 { margin: 0; font-size: 14px; font-weight: 800; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-item-info p { margin: 0; font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.place-image-box { width: 100%; height: 200px; border-radius: 12px; overflow: hidden; margin-bottom: 20px;}
+/* ---------- 2. 상세정보 패널 (가운데, 선택시만 보임) ---------- */
+.detail-panel {
+  width: 0;
+  flex-shrink: 0;
+  height: 100%;
+  background-color: white;
+  border-right: 1px solid #eee;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+  z-index: 15;
+  overflow: hidden;
+  position: relative;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.detail-panel.is-open { width: 380px; }
+
+.close-btn {
+  position: absolute; top: 16px; right: 16px; background: white; border: 1px solid #ddd;
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-weight: bold; color: #666;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 60;
+}
+
+.sidebar-content { padding: 24px; height: 100%; overflow-y: auto; box-sizing: border-box; width: 380px; }
+
+.place-image-box { width: 100%; height: 200px; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
 .place-image { width: 100%; height: 100%; object-fit: cover; }
 .badge { font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 20px; display: inline-block; width: fit-content; }
 .badge.restaurant { background-color: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
 .badge.tour { background-color: #e1f5fe; color: #0288d1; border: 1px solid #b3e5fc; }
 .place-title { font-size: 24px; font-weight: 800; margin: 8px 0; color: #111; }
 .place-address, .place-hours { font-size: 14px; color: #666; margin: 4px 0; }
-.divider { border-top: 1px solid #eee; margin: 24px 0; border-bottom: none; border-left: none; border-right: none;}
+.divider { border-top: 1px solid #eee; margin: 24px 0; border-bottom: none; border-left: none; border-right: none; }
 
 .review-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 15px; }
 .empty-review { font-size: 13px; color: #888; text-align: center; padding: 20px 0; }
-.review-item { background-color: #f9f9f9; padding: 15px; border-radius: 10px; margin-bottom: 15px;}
+.review-item { background-color: #f9f9f9; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
 .review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
 .review-author { font-size: 12px; font-weight: bold; color: #333; }
 .review-rating { font-size: 11px; }
-.review-text { font-size: 13px; color: #555; line-height: 1.5; margin: 0;}
+.review-text { font-size: 13px; color: #555; line-height: 1.5; margin: 0; }
 .review-date { font-size: 10px; color: #aaa; display: block; margin-top: 6px; text-align: right; }
 
-.review-input-box { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 20px;}
+.review-input-box { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #eee; }
 .review-inputs-top { display: flex; gap: 6px; margin-bottom: 2px; }
 .review-input-small { flex: 1; padding: 8px; font-size: 12px; border: 1px solid #ddd; border-radius: 6px; outline: none; }
 .review-select { padding: 8px; font-size: 12px; border: 1px solid #ddd; border-radius: 6px; outline: none; background: white; cursor: pointer; }
 .review-inputs-bottom { display: flex; gap: 6px; }
 .review-input-main { flex: 1; padding: 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; outline: none; }
-.review-submit-btn { padding: 0 18px; background-color: #333; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;}
+.review-submit-btn { padding: 0 18px; background-color: #333; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
+/* ---------- 3. 지도 (오른쪽, 남은 공간 전부) ---------- */
+.map-area {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+}
 </style>
