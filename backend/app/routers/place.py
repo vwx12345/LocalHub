@@ -1,4 +1,3 @@
-# app/routers/place.py
 from fastapi import APIRouter, Query, HTTPException
 import sqlite3
 from app.core.config import settings
@@ -173,5 +172,50 @@ def delete_review(review_id: int, review: ReviewDelete):
     except Exception as e:
         print(f"❌ 리뷰 삭제 실패: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+# ==========================================
+# 👇 6. 새로 추가된 랭킹 조회 API 👇
+# ==========================================
+@router.get("/ranking")
+def get_place_ranking(type: str = Query("restaurant")):
+    """
+    type에 따라 'restaurant' 또는 'tour'의 랭킹 TOP 5를 반환합니다.
+    (평점 높은 순 -> 리뷰 많은 순)
+    """
+    db_path = settings.database_url.replace("sqlite:///", "")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    try:
+        query = """
+        SELECT 
+            p.id, 
+            p.content_id,
+            p.title, 
+            p.address, 
+            p.image_url, 
+            p.map_x,
+            p.map_y,
+            p.type,
+            COUNT(r.id) AS review_count,
+            ROUND(AVG(r.rating), 1) AS avg_rating
+        FROM places p
+        JOIN reviews r ON p.id = r.place_id
+        WHERE p.type = ?
+        GROUP BY p.id
+        ORDER BY avg_rating DESC, review_count DESC
+        LIMIT 5
+        """
+        
+        cursor.execute(query, (type,))
+        rows = cursor.fetchall()
+        
+        return [dict(row) for row in rows]
+    except Exception as e:
+        print(f"❌ 랭킹 조회 실패: {e}")
+        return {"error": str(e)}
     finally:
         conn.close()

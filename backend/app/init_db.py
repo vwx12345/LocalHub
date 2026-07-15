@@ -3,6 +3,7 @@ import json
 import sqlite3
 
 import os
+import random
 
 # 1. 현재 파일(init_db.py)이 있는 폴더 위치인 'backend/app'을 가져옵니다.
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -82,6 +83,52 @@ def load_and_insert(file_name, place_type):
 # (만약 실제 파일 이름이 다르다면 아래 파일명을 본인 파일명에 맞게 변경해주세요!)
 load_and_insert("restaurant.json", "restaurant")
 load_and_insert("tour.json", "tour")
+
+def generate_dummy_reviews():
+    # 1. 맛집 5개, 관광지 5개의 실제 DB ID를 가져옵니다.
+    cursor.execute("SELECT id, title FROM places WHERE type='restaurant' LIMIT 5")
+    restaurants = cursor.fetchall()
+
+    cursor.execute("SELECT id, title FROM places WHERE type='tour' LIMIT 5")
+    tours = cursor.fetchall()
+
+    # 2. 랜덤으로 달아줄 리뷰 템플릿과 닉네임 목록
+    review_templates = [
+        ("정말 최고였어요! 다음에 또 오고 싶습니다.", 5),
+        ("기대 이상이네요. 주변에도 추천할게요.", 5),
+        ("전체적으로 무난하고 괜찮았습니다.", 4),
+        ("가족들과 함께 갔는데 다들 만족했어요.", 4),
+        ("생각보다 평범했어요. 한 번쯤 가볼 만합니다.", 3),
+        ("조금 아쉬운 부분이 있었지만 나쁘지 않네요.", 3),
+        ("개인적인 취향은 아니었어요. 아쉽습니다.", 2),
+        ("SNS에서 본 거랑 좀 달라서 실망했어요.", 2)
+    ]
+    nicknames = ["지나가던행인", "프로리뷰어", "로컬주민", "여행조아", "솔직후기남", "동네주민", "방구석미식가"]
+
+    target_places = restaurants + tours
+    inserted_reviews = 0
+
+    # 3. 10개의 장소에 각각 4~6개의 리뷰를 랜덤으로 작성
+    for place_id, title in target_places:
+        num_reviews = random.randint(4, 6) # 4개에서 6개 사이
+        
+        for _ in range(num_reviews):
+            content, rating = random.choice(review_templates)
+            nickname = random.choice(nicknames)
+            password = "1234" # 테스트용 비밀번호 통일
+            
+            cursor.execute("""
+            INSERT INTO reviews (place_id, nickname, password, rating, content)
+            VALUES (?, ?, ?, ?, ?)
+            """, (place_id, nickname, password, rating, content))
+            
+            inserted_reviews += 1
+
+    conn.commit()
+    print(f"🌟 추천 시스템용 맛집/관광지 10곳에 총 {inserted_reviews}개의 더미 리뷰를 등록했습니다!")
+
+# 함수 실행
+generate_dummy_reviews()
 
 # 5. 연결 종료
 conn.close()

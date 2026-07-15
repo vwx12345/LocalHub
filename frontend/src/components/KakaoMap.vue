@@ -7,6 +7,7 @@
           <button @click="clickFilter('')" :class="['btn', { active: activeFilter === '' }]">전체보기</button>
           <button @click="clickFilter('restaurant')" :class="['btn', 'btn-res', { active: activeFilter === 'restaurant' }]">🍔 맛집</button>
           <button @click="clickFilter('tour')" :class="['btn', 'btn-tour', { active: activeFilter === 'tour' }]">🎯 관광지</button>
+          <button @click="clickRanking()" :class="['btn', 'btn-ranking', { active: activeFilter === 'ranking' }]">🏆 랭킹</button>
         </div>
 
         <div class="search-box">
@@ -22,7 +23,11 @@
       </div>
 
       <div class="list-title-box">
-        <h3 class="list-title">📍 검색된 장소 목록 <span>{{ placeList.length }}건</span></h3>
+        <h3 class="list-title">
+          <span v-if="activeFilter === 'ranking'">🏆 {{ rankingCategory === 'restaurant' ? '맛집' : '관광지' }} TOP 5</span>
+          <span v-else>📍 검색된 장소 목록</span>
+          <span>{{ placeList.length }}건</span>
+        </h3>
       </div>
 
       <div class="list-container">
@@ -39,12 +44,21 @@
           @click="selectPlace(p)"
         >
           <div class="list-item-img">
+            <div v-if="activeFilter === 'ranking'" class="ranking-badge">
+              <span v-if="p.rank === 1">🥇</span>
+              <span v-else-if="p.rank === 2">🥈</span>
+              <span v-else-if="p.rank === 3">🥉</span>
+              <span v-else>{{ p.rank }}</span>
+            </div>
             <img :src="p.image_url || getDefaultImage(p.type)" alt="썸네일"/>
           </div>
           <div class="list-item-info">
             <span class="badge" :class="p.type">{{ p.type === 'restaurant' ? '맛집' : '관광지' }}</span>
             <h4>{{ p.title }}</h4>
-            <p>{{ p.address }}</p>
+            <p v-if="activeFilter === 'ranking'" class="ranking-info">
+              ⭐ {{ p.avg_rating }} <span class="review-count">리뷰 {{ p.review_count }}개</span>
+            </p>
+            <p v-else>{{ p.address }}</p>
           </div>
         </div>
       </div>
@@ -62,7 +76,7 @@
           <span class="badge" :class="activePlace.type">{{ activePlace.type === 'restaurant' ? '맛집' : '관광지' }}</span>
           <h2 class="place-title">{{ activePlace.title }}</h2>
           <p class="place-address">📍 {{ activePlace.address }}</p>
-          <p class="place-hours">⏰ 영업시간: 매일 09:00 - 21:00 (준비중)</p>
+          <p class="place-hours">⏰ 영업시간: 매일 09:00 - 21:00 준비중</p>
         </div>
 
         <hr class="divider" />
@@ -164,6 +178,9 @@ const activePlace = ref(null)
 const isBoundsUpdateActive = ref(true)
 
 const activeFilter = ref('')
+// 현재 어떤 카테고리의 랭킹을 보여줄지 저장하는 변수 추가
+const rankingCategory = ref('restaurant') 
+
 const searchQuery = ref('')
 const markers = ref([])
 let kakaoMap = null
@@ -175,13 +192,8 @@ let selectedLabelOverlay = null
 const MARKER_COLORS = { restaurant: '#ff9800', tour: '#03a9f4' }
 const SELECTED_MARKER_COLOR = '#212121'
 
-// ⭐️ 추가된 부분: 카테고리별 기본 이미지 분기 처리 함수
 const getDefaultImage = (type) => {
-  if (type === 'tour') {
-    // 관광지 기본 이미지 (여행/풍경 느낌)
-    return 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=400';
-  }
-  // 맛집 기본 이미지
+  if (type === 'tour') return 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=400';
   return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=400';
 }
 
@@ -239,7 +251,6 @@ const hideSelectedLabel = () => {
 
 const reviews = ref([])
 const reviewForm = ref({ nickname: '', password: '', rating: 5, content: '' })
-
 const editingReviewId = ref(null)
 const deletingReviewId = ref(null)
 const actionPassword = ref('')
@@ -257,12 +268,13 @@ onMounted(() => {
     }
     kakaoMap = new kakao.maps.Map(container, options)
 
-   hoverOverlay = new kakao.maps.CustomOverlay({
-    zIndex: 5,
+    hoverOverlay = new kakao.maps.CustomOverlay({
+      zIndex: 5,
       yAnchor: 1.7 
     })
+    
     kakao.maps.event.addListener(kakaoMap, 'idle', () => {
-      if (isBoundsUpdateActive.value) {
+      if (isBoundsUpdateActive.value && activeFilter.value !== 'ranking') {
         updateVisibleList()
       }
     })
@@ -286,9 +298,8 @@ onMounted(() => {
 const loadDataFromServer = async (type, keyword) => {
   const { kakao } = window
   try {
-    markers.value.forEach((m) => m.marker.setMap(null))
+    markers.value.forEach(m => m.marker.setMap(null))
     markers.value = []
-
     selectedMarkerItem = null
     hideSelectedLabel()
 
@@ -330,9 +341,7 @@ const loadDataFromServer = async (type, keyword) => {
           hoverOverlay.setMap(kakaoMap);
         });
 
-        kakao.maps.event.addListener(marker, 'mouseout', () => {
-          hoverOverlay.setMap(null);
-        });
+        kakao.maps.event.addListener(marker, 'mouseout', () => hoverOverlay.setMap(null));
         kakao.maps.event.addListener(marker, 'click', () => selectPlace(place))
       }
     })
@@ -340,6 +349,89 @@ const loadDataFromServer = async (type, keyword) => {
   } catch (error) {
     console.error('❌ 데이터 로드 실패:', error)
     return []
+  }
+}
+
+// 조건에 맞게 분기 처리된 랭킹 클릭 함수
+const clickRanking = async () => {
+  const { kakao } = window
+  
+  // 방금 전 활성화 필터가 관광지였으면 관광지 랭킹 타겟으로 설정하고 그 외에는 맛집 랭킹 타겟으로 설정
+  let targetType = 'restaurant'
+  if (activeFilter.value === 'tour') {
+    targetType = 'tour'
+  } else if (activeFilter.value === 'ranking') {
+    targetType = rankingCategory.value
+  }
+
+  rankingCategory.value = targetType
+  activeFilter.value = 'ranking'
+  searchQuery.value = ''
+  isBoundsUpdateActive.value = false 
+  closeDetail()
+
+  try {
+    markers.value.forEach(m => m.marker.setMap(null))
+    markers.value = []
+    selectedMarkerItem = null
+    hideSelectedLabel()
+
+    // 타겟으로 설정된 타입 한 가지만 API 요청
+    const res = await axios.get(`http://localhost:8000/api/ranking?type=${targetType}`)
+    
+    // 순위 데이터 매핑
+    const rankedPlaces = res.data.map((p, i) => ({ ...p, rank: i + 1 }))
+    placeList.value = rankedPlaces
+
+    const bounds = new kakao.maps.LatLngBounds()
+
+    rankedPlaces.forEach((place) => {
+      if (place.map_x && place.map_y) {
+        const markerPosition = new kakao.maps.LatLng(place.map_y, place.map_x)
+        bounds.extend(markerPosition) 
+
+        const normalImage = createMarkerImage(MARKER_COLORS[place.type] || '#555555')
+        const marker = new kakao.maps.Marker({
+          position: markerPosition,
+          title: place.title,
+          image: normalImage,
+        })
+
+        marker.setMap(kakaoMap)
+        const markerItem = { marker, place, normalImage }
+        markers.value.push(markerItem)
+
+        kakao.maps.event.addListener(marker, 'mouseover', () => {
+          const medal = place.rank === 1 ? '🥇' : place.rank === 2 ? '🥈' : place.rank === 3 ? '🥉' : `${place.rank}위`
+          const content = `<div style="
+            padding: 8px 16px;
+            background: #ffffff;
+            color: #212529;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            font-family: 'Pretendard', sans-serif;
+            text-align: center;
+            white-space: nowrap;
+            border: 1px solid #e9ecef;
+          ">${medal} ${place.title}</div>`;
+
+          hoverOverlay.setContent(content);
+          hoverOverlay.setPosition(marker.getPosition());
+          hoverOverlay.setMap(kakaoMap);
+        });
+
+        kakao.maps.event.addListener(marker, 'mouseout', () => hoverOverlay.setMap(null));
+        kakao.maps.event.addListener(marker, 'click', () => selectPlace(place))
+      }
+    })
+
+    if (rankedPlaces.length > 0) {
+      kakaoMap.setBounds(bounds)
+    }
+  } catch (error) {
+    console.error('❌ 랭킹 로드 실패:', error)
   }
 }
 
@@ -445,7 +537,7 @@ const confirmDeleteReview = async (rev) => {
       data: { password: actionPassword.value }
     })
 
-    reviews.value = reviews.value.filter((r) => r.id !== rev.id)
+    reviews.value = reviews.value.filter(r => r.id !== rev.id)
     cancelReviewAction()
   } catch (error) {
     console.error('❌ 리뷰 삭제 실패:', error)
@@ -473,7 +565,7 @@ const selectPlace = (place) => {
   cancelReviewAction()
   fetchReviews(place.id)
 
-  const markerItem = markers.value.find((m) => m.place.id === place.id)
+  const markerItem = markers.value.find(m => m.place.id === place.id)
   if (selectedMarkerItem && selectedMarkerItem !== markerItem) {
     setMarkerSelected(selectedMarkerItem, false)
   }
@@ -579,7 +671,6 @@ const handleSearch = async () => {
 </script>
 
 <style scoped>
-/* ⭐️ 웹 폰트 적용 (Pretendard) - 모던한 느낌의 핵심 */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
 * {
@@ -587,7 +678,6 @@ const handleSearch = async () => {
   box-sizing: border-box;
 }
 
-/* 커스텀 스크롤바 (얇고 예쁘게) */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
@@ -603,7 +693,6 @@ const handleSearch = async () => {
   align-items: stretch;
 }
 
-/* ---------- 1. 리스트 패널 ---------- */
 .list-panel {
   width: 380px;
   flex-shrink: 0;
@@ -625,7 +714,7 @@ const handleSearch = async () => {
   z-index: 2;
 }
 
-.filter-buttons { display: flex; gap: 8px; }
+.filter-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn { 
   padding: 10px 16px; 
   border-radius: 12px;
@@ -641,6 +730,7 @@ const handleSearch = async () => {
 .btn.active { background-color: #212529; color: white; box-shadow: 0 4px 12px rgba(33, 37, 41, 0.2); }
 .btn-res.active { background-color: #ff922b; color: white; box-shadow: 0 4px 12px rgba(255, 146, 43, 0.2); }
 .btn-tour.active { background-color: #339af0; color: white; box-shadow: 0 4px 12px rgba(51, 154, 240, 0.2); }
+.btn-ranking.active { background-color: #fab005; color: #212529; box-shadow: 0 4px 12px rgba(250, 176, 5, 0.25); }
 
 .search-box { display: flex; gap: 8px; }
 .search-input { 
@@ -674,18 +764,27 @@ const handleSearch = async () => {
 }
 .list-item:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.06); border-color: #e9ecef; }
 .list-item.is-active { background: #f8f9fa; border-color: #212529; border-width: 2px; padding: 13px; }
-.list-item-img { width: 68px; height: 68px; border-radius: 12px; overflow: hidden; flex-shrink: 0; background: #f1f3f5;}
-.list-item-img img { width: 100%; height: 100%; object-fit: cover; }
+
+.list-item-img { position: relative; width: 68px; height: 68px; border-radius: 12px; flex-shrink: 0; background: #f1f3f5;}
+.list-item-img img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px;}
+.ranking-badge {
+  position: absolute; top: -6px; left: -6px;
+  background: #343a40; color: white;
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; box-shadow: 0 2px 6px rgba(0,0,0,0.2); z-index: 2;
+}
+
 .list-item-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .list-item-info h4 { margin: 0; font-size: 16px; font-weight: 700; color: #212529; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .list-item-info p { margin: 0; font-size: 13px; color: #868e96; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ranking-info { color: #f59f00 !important; font-weight: 700; }
+.ranking-info .review-count { color: #868e96; font-weight: 500; font-size: 12px; margin-left: 4px;}
 
-/* 뱃지 디자인 */
 .badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; display: inline-block; width: fit-content; letter-spacing: -0.3px;}
 .badge.restaurant { background-color: #fff4e6; color: #fd7e14; }
 .badge.tour { background-color: #e7f5ff; color: #228be6; }
 
-/* ---------- 2. 상세정보 패널 ---------- */
 .detail-panel {
   width: 0; flex-shrink: 0; height: 100%; background-color: #ffffff;
   border-right: 1px solid #edf2f7; box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04);
@@ -719,7 +818,6 @@ const handleSearch = async () => {
 .review-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .review-author { font-size: 14px; font-weight: 700; color: #212529; white-space: nowrap; }
 
-/* ⭐️ 별점 스타일링 (글씨체 영향 없이 렌더링되게) */
 .review-stars { display: inline-flex; gap: 1px; flex-shrink: 0; }
 .star { font-size: 13px; line-height: 1; }
 .star.is-empty { color: #868e96; }
@@ -733,10 +831,8 @@ const handleSearch = async () => {
 .review-text { font-size: 14px; color: #495057; line-height: 1.6; margin: 0; }
 .review-date { font-size: 12px; color: #adb5bd; display: block; margin-top: 10px; }
 
-/* 리뷰 폼 입력창 공통 디자인 */
 .review-input-box { display: flex; flex-direction: column; gap: 10px; margin-top: 32px; padding: 24px; background: #f8f9fa; border-radius: 16px; }
 .review-inputs-top, .review-inputs-bottom { display: flex; gap: 8px; width: 100%; }
-/* ⭐️ min-width: 0 추가로 입력창 잘림/삐져나감 방지 */
 .review-input-small, .review-input-main, .review-select { 
   padding: 12px; font-size: 14px; border: 1px solid #e9ecef; border-radius: 10px; outline: none; transition: all 0.2s; background: white; min-width: 0;
 }
@@ -748,10 +844,8 @@ const handleSearch = async () => {
 .review-submit-btn { padding: 0 20px; background-color: #212529; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: background 0.2s;}
 .review-submit-btn:hover { background-color: #343a40; }
 
-/* 수정/삭제 폼 여백 */
 .review-edit-box { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e9ecef;}
 .review-delete-confirm { display: flex; gap: 8px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e9ecef;}
 
-/* ---------- 3. 지도 ---------- */
 .map-area { flex: 1; height: 100%; min-width: 0; }
 </style>
