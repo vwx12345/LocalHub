@@ -1,6 +1,6 @@
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
@@ -11,6 +11,8 @@ const props = defineProps({
 })
 
 const router = useRouter()
+
+const place = ref(null)
 
 const categoryInfo = computed(() => {
   const categories = {
@@ -31,12 +33,58 @@ const categoryInfo = computed(() => {
   return categories[props.post.category] || categories.free
 })
 
+const placeTitle = computed(() => {
+  if (!place.value) {
+    return ''
+  }
+
+  return place.value.title || '장소 정보'
+})
+
+async function fetchPlace() {
+  if (!props.post.place_id) {
+    return
+  }
+
+  try {
+    const response = await fetch(
+      `/api/places/${props.post.place_id}`,
+    )
+
+    if (!response.ok) {
+      return
+    }
+
+    place.value = await response.json()
+  } catch (error) {
+    console.error('장소 정보 조회 실패:', error)
+    place.value = null
+  }
+}
+
 function goDetail() {
   router.push(`/posts/${props.post.id}`)
 }
 
+function goPlace(event) {
+  event.stopPropagation()
+
+  if (!props.post.place_id) {
+    return
+  }
+
+  router.push({
+    path: '/map',
+    query: {
+      place_id: props.post.place_id,
+    },
+  })
+}
+
 function formatDate(date) {
-  if (!date) return ''
+  if (!date) {
+    return ''
+  }
 
   return new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
@@ -44,6 +92,8 @@ function formatDate(date) {
     day: '2-digit',
   }).format(new Date(date))
 }
+
+onMounted(fetchPlace)
 </script>
 
 <template>
@@ -62,6 +112,15 @@ function formatDate(date) {
       </span>
 
       <h3>{{ post.title }}</h3>
+
+      <button
+        v-if="place"
+        type="button"
+        class="place-tag"
+        @click="goPlace"
+      >
+        📍 {{ placeTitle }}
+      </button>
 
       <p class="post-preview">
         {{ post.content }}
@@ -119,19 +178,16 @@ function formatDate(date) {
   font-weight: 700;
 }
 
-/* 맛집 추천 */
 .post-badge.restaurant {
   background: #fff4e6;
   color: #f76707;
 }
 
-/* 관광지 추천 */
 .post-badge.tour {
   background: #e7f5ff;
   color: #228be6;
 }
 
-/* 자유게시판 */
 .post-badge.free {
   background: #f1f3f5;
   color: #495057;
@@ -148,6 +204,33 @@ h3 {
 
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.place-tag {
+  display: inline-flex;
+  align-items: center;
+
+  width: fit-content;
+  margin-top: 9px;
+  padding: 5px 9px;
+
+  border: 1px solid #ffd8a8;
+  border-radius: 7px;
+
+  background: #fff4e6;
+  color: #e8590c;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  transition: all 0.2s ease;
+}
+
+.place-tag:hover {
+  background: #ffe8cc;
+  border-color: #ffa94d;
 }
 
 .post-preview {
@@ -199,3 +282,4 @@ h3 {
   }
 }
 </style>
+

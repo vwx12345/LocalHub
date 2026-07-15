@@ -11,6 +11,17 @@ const posts = ref([])
 const loading = ref(false)
 const error = ref('')
 
+/*
+ * 게시글 ID별 장소 정보를 저장합니다.
+ *
+ * 예:
+ * {
+ *   10: { id: 3, title: '성심당 본점', ... },
+ *   11: { id: 7, title: '한밭수목원', ... }
+ * }
+ */
+const placesByPostId = ref({})
+
 const recentPosts = computed(() => {
   return posts.value.slice(0, 3)
 })
@@ -20,22 +31,63 @@ const categoryInfo = {
     label: '맛집 추천',
     icon: '🍽️',
   },
+
   tour: {
     label: '관광지 추천',
     icon: '🗺️',
   },
+
   free: {
     label: '자유게시판',
     icon: '💬',
   },
 }
 
+async function fetchPlaceForPost(post) {
+  if (!post.place_id) {
+    return
+  }
+
+  try {
+    const response = await fetch(
+      `/api/places/${post.place_id}`,
+    )
+
+    if (!response.ok) {
+      return
+    }
+
+    const placeData = await response.json()
+
+    placesByPostId.value = {
+      ...placesByPostId.value,
+      [post.id]: placeData,
+    }
+  } catch (err) {
+    console.error(
+      `게시글 ${post.id}의 장소 정보 조회 실패:`,
+      err,
+    )
+  }
+}
+
 async function fetchRecentPosts() {
   try {
     loading.value = true
     error.value = ''
+    placesByPostId.value = {}
 
     posts.value = await getPosts()
+
+    /*
+     * 메인에 표시되는 최근 게시글 3개의
+     * 장소 정보만 조회합니다.
+     */
+    await Promise.all(
+      recentPosts.value.map((post) =>
+        fetchPlaceForPost(post),
+      ),
+    )
   } catch (err) {
     error.value =
       err.message ||
@@ -46,7 +98,28 @@ async function fetchRecentPosts() {
 }
 
 function getCategory(post) {
-  return categoryInfo[post.category] || categoryInfo.free
+  return (
+    categoryInfo[post.category] ||
+    categoryInfo.free
+  )
+}
+
+function getPlace(post) {
+  return placesByPostId.value[post.id] || null
+}
+
+function getPlaceTitle(post) {
+  const place = getPlace(post)
+
+  if (!place) {
+    return ''
+  }
+
+  return (
+    place.title ||
+    place.name ||
+    '장소 정보'
+  )
 }
 
 function goMap(type) {
@@ -64,8 +137,30 @@ function goPost(postId) {
   router.push(`/posts/${postId}`)
 }
 
+/*
+ * 장소 태그를 클릭하면 카드의 게시글 상세 이동은 막고
+ * 해당 장소가 선택된 지도 화면으로 이동합니다.
+ */
+function goPlace(event, post) {
+  event.stopPropagation()
+
+  if (!post.place_id) {
+    return
+  }
+
+  router.push({
+    path: '/map',
+
+    query: {
+      place_id: post.place_id,
+    },
+  })
+}
+
 function formatDate(date) {
-  if (!date) return ''
+  if (!date) {
+    return ''
+  }
 
   return new Intl.DateTimeFormat('ko-KR', {
     month: '2-digit',
@@ -80,7 +175,9 @@ onMounted(fetchRecentPosts)
   <main class="home-page">
     <section class="hero-section">
       <div class="hero-content">
-        <span class="hero-label">DAEJEON · CHUNGCHEONG</span>
+        <span class="hero-label">
+          DAEJEON · CHUNGCHEONG
+        </span>
 
         <h1>
           대전·충청의 맛집과 관광지를<br />
@@ -88,11 +185,13 @@ onMounted(fetchRecentPosts)
         </h1>
 
         <p>
-          지도에서 원하는 장소를 찾고 지역 이용자들과 다양한 정보를 공유해 보세요.
+          지도에서 원하는 장소를 찾고 지역 이용자들과
+          다양한 정보를 공유해 보세요.
         </p>
 
         <div class="hero-buttons">
           <button
+            type="button"
             class="hero-button restaurant"
             @click="goMap('restaurant')"
           >
@@ -100,6 +199,7 @@ onMounted(fetchRecentPosts)
           </button>
 
           <button
+            type="button"
             class="hero-button tour"
             @click="goMap('tour')"
           >
@@ -112,17 +212,27 @@ onMounted(fetchRecentPosts)
     <section class="home-section">
       <div class="section-header">
         <div>
-          <span class="section-label">COMMUNITY</span>
+          <span class="section-label">
+            COMMUNITY
+          </span>
+
           <h2>최근 지역 이야기</h2>
         </div>
 
-        <button class="board-link" @click="goBoard">
+        <button
+          type="button"
+          class="board-link"
+          @click="goBoard"
+        >
           게시판 전체 보기
           <span>→</span>
         </button>
       </div>
 
-      <div v-if="loading" class="recent-state">
+      <div
+        v-if="loading"
+        class="recent-state"
+      >
         <span>⏳</span>
         <p>최근 게시글을 불러오는 중입니다.</p>
       </div>
@@ -178,13 +288,27 @@ onMounted(fetchRecentPosts)
 
           <h3>{{ post.title }}</h3>
 
+          <!-- 연결된 장소 태그 -->
+          <button
+            v-if="getPlace(post)"
+            type="button"
+            class="recent-place-tag"
+            :class="post.category || 'free'"
+            @click="goPlace($event, post)"
+          >
+            📍 {{ getPlaceTitle(post) }}
+          </button>
+
           <p>
             {{ post.content }}
           </p>
 
           <div class="recent-post-bottom">
             <span>👁 {{ post.views }}</span>
-            <span class="recent-arrow">자세히 보기 →</span>
+
+            <span class="recent-arrow">
+              자세히 보기 →
+            </span>
           </div>
         </article>
       </div>
@@ -196,14 +320,17 @@ onMounted(fetchRecentPosts)
 .home-page {
   width: 100%;
   height: 100%;
+
   overflow-y: auto;
+
   background: #f8f9fa;
 }
 
 .hero-section {
+  box-sizing: border-box;
   width: 100%;
   padding: 80px 20px;
-  box-sizing: border-box;
+
   background:
     radial-gradient(
       circle at 80% 20%,
@@ -216,6 +343,7 @@ onMounted(fetchRecentPosts)
       #ffffff 55%,
       #f1f8ff 100%
     );
+
   border-bottom: 1px solid #edf2f7;
 }
 
@@ -227,8 +355,11 @@ onMounted(fetchRecentPosts)
 .hero-label,
 .section-label {
   display: block;
+
   margin-bottom: 12px;
+
   color: #f08c00;
+
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 2px;
@@ -236,7 +367,9 @@ onMounted(fetchRecentPosts)
 
 .hero-content h1 {
   margin: 0;
+
   color: #212529;
+
   font-size: clamp(36px, 5vw, 58px);
   font-weight: 900;
   line-height: 1.25;
@@ -246,7 +379,9 @@ onMounted(fetchRecentPosts)
 .hero-content p {
   max-width: 620px;
   margin: 22px 0 0;
+
   color: #6c757d;
+
   font-size: 17px;
   line-height: 1.8;
 }
@@ -255,17 +390,23 @@ onMounted(fetchRecentPosts)
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+
   margin-top: 32px;
 }
 
 .hero-button {
   padding: 15px 24px;
+
   border: none;
   border-radius: 14px;
+
   color: #fff;
+
   cursor: pointer;
+
   font-size: 15px;
   font-weight: 800;
+
   transition: all 0.2s ease;
 }
 
@@ -275,7 +416,10 @@ onMounted(fetchRecentPosts)
 
 .hero-button.restaurant {
   background: #ff922b;
-  box-shadow: 0 7px 18px rgba(255, 146, 43, 0.25);
+
+  box-shadow:
+    0 7px 18px
+    rgba(255, 146, 43, 0.25);
 }
 
 .hero-button.restaurant:hover {
@@ -284,7 +428,10 @@ onMounted(fetchRecentPosts)
 
 .hero-button.tour {
   background: #339af0;
-  box-shadow: 0 7px 18px rgba(51, 154, 240, 0.22);
+
+  box-shadow:
+    0 7px 18px
+    rgba(51, 154, 240, 0.22);
 }
 
 .hero-button.tour:hover {
@@ -292,7 +439,11 @@ onMounted(fetchRecentPosts)
 }
 
 .home-section {
-  width: min(1080px, calc(100% - 40px));
+  width: min(
+    1080px,
+    calc(100% - 40px)
+  );
+
   margin: 0 auto;
   padding: 55px 0 70px;
 }
@@ -302,12 +453,15 @@ onMounted(fetchRecentPosts)
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
+
   margin-bottom: 20px;
 }
 
 .section-header h2 {
   margin: 0;
+
   color: #212529;
+
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -1px;
@@ -321,11 +475,16 @@ onMounted(fetchRecentPosts)
   display: flex;
   align-items: center;
   gap: 8px;
+
   padding: 10px 14px;
+
   border: none;
+
   background: transparent;
   color: #495057;
+
   cursor: pointer;
+
   font-size: 14px;
   font-weight: 700;
 }
@@ -336,26 +495,37 @@ onMounted(fetchRecentPosts)
 
 .recent-post-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
 .recent-post-card {
   min-width: 0;
   padding: 22px;
+
   background: #fff;
   border: 1px solid #edf2f7;
   border-radius: 18px;
+
   cursor: pointer;
   outline: none;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.04);
+
+  box-shadow:
+    0 8px 28px
+    rgba(0, 0, 0, 0.04);
+
   transition: all 0.2s ease;
 }
 
 .recent-post-card:hover,
 .recent-post-card:focus {
   border-color: #dee2e6;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.075);
+
+  box-shadow:
+    0 12px 28px
+    rgba(0, 0, 0, 0.075);
+
   transform: translateY(-3px);
 }
 
@@ -370,8 +540,11 @@ onMounted(fetchRecentPosts)
   display: inline-flex;
   align-items: center;
   gap: 4px;
+
   padding: 5px 9px;
+
   border-radius: 7px;
+
   font-size: 11px;
   font-weight: 800;
 }
@@ -393,28 +566,83 @@ onMounted(fetchRecentPosts)
 
 .recent-date {
   flex-shrink: 0;
+
   color: #adb5bd;
+
   font-size: 12px;
 }
 
 .recent-post-card h3 {
   margin: 18px 0 0;
+
   overflow: hidden;
+
   color: #212529;
+
   font-size: 17px;
   font-weight: 800;
+
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* 장소 태그 */
+.recent-place-tag {
+  display: inline-flex;
+  align-items: center;
+
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 5px 9px;
+
+  overflow: hidden;
+
+  border: 1px solid #ffd8a8;
+  border-radius: 7px;
+
+  background: #fff4e6;
+  color: #e8590c;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 750;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  transition: all 0.2s ease;
+}
+
+.recent-place-tag:hover {
+  background: #ffe8cc;
+  border-color: #ffa94d;
+}
+
+.recent-place-tag.tour {
+  background: #e7f5ff;
+  border-color: #a5d8ff;
+  color: #1971c2;
+}
+
+.recent-place-tag.tour:hover {
+  background: #d0ebff;
+  border-color: #74c0fc;
+}
+
 .recent-post-card > p {
   display: -webkit-box;
+
   min-height: 44px;
   margin: 10px 0 0;
+
   overflow: hidden;
+
   color: #868e96;
+
   font-size: 13px;
   line-height: 1.65;
+
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -423,10 +651,14 @@ onMounted(fetchRecentPosts)
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   margin-top: 20px;
   padding-top: 15px;
+
   border-top: 1px solid #f1f3f5;
+
   color: #adb5bd;
+
   font-size: 12px;
 }
 
@@ -437,16 +669,22 @@ onMounted(fetchRecentPosts)
 
 .recent-state {
   min-height: 190px;
+
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+
   background: #fff;
   border: 1px solid #edf2f7;
   border-radius: 18px;
+
   color: #868e96;
   text-align: center;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.04);
+
+  box-shadow:
+    0 8px 28px
+    rgba(0, 0, 0, 0.04);
 }
 
 .recent-state > span {
@@ -460,10 +698,13 @@ onMounted(fetchRecentPosts)
 .recent-state button {
   margin-top: 14px;
   padding: 9px 14px;
+
   border: none;
   border-radius: 9px;
+
   background: #e9ecef;
   color: #495057;
+
   cursor: pointer;
   font-weight: 700;
 }
