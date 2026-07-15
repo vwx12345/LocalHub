@@ -11,10 +11,10 @@ const isOpen = ref(false)
   <div class="app-wrapper">
     <header class="top-nav">
       <RouterLink to="/" class="logo">
-        <h2>LocalHub</h2>
+        <h2>대충커뮤</h2>
       </RouterLink>
       <nav class="nav-links">
-        <RouterLink to="/">게시판(Home)</RouterLink>
+        <RouterLink to="/board">게시판(board)</RouterLink>
         <RouterLink to="/map">지도(Map)</RouterLink>
       </nav>
     </header>

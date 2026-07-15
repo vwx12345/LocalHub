@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { deletePost, getComments, getPost } from '../api/post'
@@ -14,6 +14,16 @@ const loading = ref(true)
 const error = ref('')
 
 const postId = route.params.id
+
+const categoryInfo = computed(() => {
+  const categories = {
+    restaurant: { label: '맛집 추천', icon: '🍽️' },
+    tour: { label: '관광지 추천', icon: '🗺️' },
+    free: { label: '자유게시판', icon: '💬' },
+  }
+
+  return categories[post.value?.category] || categories.free
+})
 
 async function fetchData() {
   try {
@@ -40,7 +50,10 @@ async function refreshComments() {
 }
 
 function goList() {
-  router.push('/')
+  router.push({
+    path: '/board',
+    query: post.value?.category ? { category: post.value.category } : {},
+  })
 }
 
 function goEdit() {
@@ -62,7 +75,7 @@ async function removePost() {
     await deletePost(postId, password)
 
     alert('게시글이 삭제되었습니다.')
-    router.push('/')
+    goList()
   } catch (err) {
     alert(err.message)
   }
@@ -103,7 +116,12 @@ onMounted(fetchData)
 
         <article class="post-card">
           <header class="post-header">
-            <span class="category-badge">지역 이야기</span>
+            <span
+              class="category-badge"
+              :class="post.category || 'free'"
+            >
+              {{ categoryInfo.icon }} {{ categoryInfo.label }}
+            </span>
 
             <h1>{{ post.title }}</h1>
 
@@ -174,10 +192,24 @@ onMounted(fetchData)
   margin-bottom: 14px;
   padding: 5px 10px;
   border-radius: 7px;
-  background: #e7f5ff;
-  color: #228be6;
   font-size: 12px;
   font-weight: 700;
+}
+
+
+.category-badge.restaurant {
+  background: #fff4e6;
+  color: #f76707;
+}
+
+.category-badge.tour {
+  background: #e7f5ff;
+  color: #228be6;
+}
+
+.category-badge.free {
+  background: #f1f3f5;
+  color: #495057;
 }
 
 .post-header h1 {
@@ -279,7 +311,23 @@ onMounted(fetchData)
     padding: 24px 20px;
   }
 
-  .post-header h1 {
+  
+.category-badge.restaurant {
+  background: #fff4e6;
+  color: #f76707;
+}
+
+.category-badge.tour {
+  background: #e7f5ff;
+  color: #228be6;
+}
+
+.category-badge.free {
+  background: #f1f3f5;
+  color: #495057;
+}
+
+.post-header h1 {
     font-size: 24px;
   }
 

@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -19,14 +21,33 @@ router = APIRouter(
 )
 
 
+PostCategory = Literal[
+    "restaurant",
+    "tour",
+    "free",
+]
+
+
 @router.get(
     "",
     response_model=list[PostResponse],
 )
 def get_posts(
+    category: PostCategory | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> list[Post]:
-    statement = select(Post).order_by(Post.id.desc())
+    statement = select(Post)
+
+    # category가 전달된 경우 해당 게시판 글만 조회
+    if category is not None:
+        statement = statement.where(
+            Post.category == category,
+        )
+
+    statement = statement.order_by(
+        Post.id.desc(),
+    )
+
     posts = db.scalars(statement).all()
 
     return list(posts)
@@ -66,6 +87,7 @@ def create_post(
     db: Session = Depends(get_db),
 ) -> Post:
     post = Post(
+        category=request.category,
         title=request.title,
         content=request.content,
         password=request.password,
@@ -101,6 +123,7 @@ def update_post(
             detail="비밀번호가 일치하지 않습니다.",
         )
 
+    post.category = request.category
     post.title = request.title
     post.content = request.content
 
@@ -133,7 +156,7 @@ def delete_post(
             detail="비밀번호가 일치하지 않습니다.",
         )
 
-    # 해당 게시글에 속한 일반 댓글과 대댓글을 모두 삭제
+    # 해당 게시글의 일반 댓글과 대댓글 삭제
     db.execute(
         delete(Comment).where(
             Comment.post_id == post_id,

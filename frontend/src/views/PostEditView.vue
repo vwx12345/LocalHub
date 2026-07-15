@@ -9,6 +9,7 @@ const router = useRouter()
 
 const postId = route.params.id
 
+const category = ref('free')
 const title = ref('')
 const content = ref('')
 const password = ref('')
@@ -24,6 +25,7 @@ async function fetchPost() {
 
     const post = await getPost(postId)
 
+    category.value = post.category || 'free'
     title.value = post.title
     content.value = post.content
   } catch (err) {
@@ -38,8 +40,8 @@ async function submitUpdate() {
   const trimmedContent = content.value.trim()
   const trimmedPassword = password.value.trim()
 
-  if (!trimmedTitle || !trimmedContent || !trimmedPassword) {
-    alert('제목, 내용, 비밀번호를 모두 입력해주세요.')
+  if (!category.value || !trimmedTitle || !trimmedContent || !trimmedPassword) {
+    alert('게시판 종류, 제목, 내용, 비밀번호를 모두 입력해주세요.')
     return
   }
 
@@ -47,6 +49,7 @@ async function submitUpdate() {
     submitting.value = true
 
     await updatePost(postId, {
+      category: category.value,
       title: trimmedTitle,
       content: trimmedContent,
       password: trimmedPassword,
@@ -89,13 +92,23 @@ onMounted(fetchPost)
 
           <div>
             <h1>게시글 수정</h1>
-            <p>게시글의 제목과 내용을 수정할 수 있습니다.</p>
+            <p>게시판 종류와 게시글 내용을 수정할 수 있습니다.</p>
           </div>
         </header>
 
         <div class="divider"></div>
 
         <form class="post-form" @submit.prevent="submitUpdate">
+          <label>
+            <span>게시판 종류</span>
+
+            <select v-model="category">
+              <option value="restaurant">🍽️ 맛집 추천</option>
+              <option value="tour">🗺️ 관광지 추천</option>
+              <option value="free">💬 자유게시판</option>
+            </select>
+          </label>
+
           <label>
             <span>제목</span>
 
@@ -250,7 +263,8 @@ label > span {
 }
 
 input,
-textarea {
+textarea,
+select {
   box-sizing: border-box;
   width: 100%;
   padding: 14px;
@@ -264,10 +278,15 @@ textarea {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: #212529;
   background: #fff;
   box-shadow: 0 0 0 3px rgba(33, 37, 41, 0.08);
+}
+
+select {
+  cursor: pointer;
 }
 
 textarea {

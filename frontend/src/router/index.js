@@ -2,16 +2,22 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import HomeView from '../views/HomeView.vue'
 import MapView from '../views/MapView.vue'
+import BoardView from '../views/BoardView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
 
   routes: [
-    // 게시판 목록
+    // 홈
     {
       path: '/',
       name: 'home',
       component: HomeView,
+    },
+    {
+      path: '/board',
+      name:'board',
+      component : BoardView
     },
 
     // 게시글 작성

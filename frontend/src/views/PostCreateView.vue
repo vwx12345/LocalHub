@@ -1,11 +1,20 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { createPost } from '../api/post'
 
+const route = useRoute()
 const router = useRouter()
 
+const allowedCategories = ['restaurant', 'tour', 'free']
+const initialCategory =
+  typeof route.query.category === 'string' &&
+  allowedCategories.includes(route.query.category)
+    ? route.query.category
+    : 'free'
+
+const category = ref(initialCategory)
 const title = ref('')
 const content = ref('')
 const password = ref('')
@@ -16,8 +25,8 @@ async function submitPost() {
   const trimmedContent = content.value.trim()
   const trimmedPassword = password.value.trim()
 
-  if (!trimmedTitle || !trimmedContent || !trimmedPassword) {
-    alert('제목, 내용, 비밀번호를 모두 입력해주세요.')
+  if (!category.value || !trimmedTitle || !trimmedContent || !trimmedPassword) {
+    alert('게시판 종류, 제목, 내용, 비밀번호를 모두 입력해주세요.')
     return
   }
 
@@ -25,6 +34,7 @@ async function submitPost() {
     loading.value = true
 
     const post = await createPost({
+      category: category.value,
       title: trimmedTitle,
       content: trimmedContent,
       password: trimmedPassword,
@@ -62,6 +72,16 @@ function goBack() {
         <div class="divider"></div>
 
         <form class="post-form" @submit.prevent="submitPost">
+          <label>
+            <span>게시판 종류</span>
+
+            <select v-model="category">
+              <option value="restaurant">🍽️ 맛집 추천</option>
+              <option value="tour">🗺️ 관광지 추천</option>
+              <option value="free">💬 자유게시판</option>
+            </select>
+          </label>
+
           <label>
             <span>제목</span>
 
@@ -202,7 +222,8 @@ label > span {
 }
 
 input,
-textarea {
+textarea,
+select {
   box-sizing: border-box;
   width: 100%;
   padding: 14px;
@@ -216,10 +237,15 @@ textarea {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: #212529;
   background: #fff;
   box-shadow: 0 0 0 3px rgba(33, 37, 41, 0.08);
+}
+
+select {
+  cursor: pointer;
 }
 
 textarea {

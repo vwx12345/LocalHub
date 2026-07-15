@@ -1,8 +1,12 @@
 const BASE_URL = '/api/posts'
 
-// 게시글 전체 조회
-export async function getPosts() {
-  const response = await fetch(BASE_URL)
+// 게시글 전체 또는 카테고리별 조회
+export async function getPosts(category = '') {
+  const queryString = category
+    ? `?category=${encodeURIComponent(category)}`
+    : ''
+
+  const response = await fetch(`${BASE_URL}${queryString}`)
 
   const data = await response.json()
 

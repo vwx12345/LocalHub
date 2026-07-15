@@ -1,4 +1,6 @@
+
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
@@ -9,6 +11,25 @@ const props = defineProps({
 })
 
 const router = useRouter()
+
+const categoryInfo = computed(() => {
+  const categories = {
+    restaurant: {
+      label: '맛집 추천',
+      icon: '🍽️',
+    },
+    tour: {
+      label: '관광지 추천',
+      icon: '🗺️',
+    },
+    free: {
+      label: '자유게시판',
+      icon: '💬',
+    },
+  }
+
+  return categories[props.post.category] || categories.free
+})
 
 function goDetail() {
   router.push(`/posts/${props.post.id}`)
@@ -26,9 +47,19 @@ function formatDate(date) {
 </script>
 
 <template>
-  <article class="post-item" tabindex="0" @click="goDetail" @keyup.enter="goDetail">
+  <article
+    class="post-item"
+    tabindex="0"
+    @click="goDetail"
+    @keyup.enter="goDetail"
+  >
     <div class="post-main">
-      <span class="post-badge">지역 이야기</span>
+      <span
+        class="post-badge"
+        :class="post.category || 'free'"
+      >
+        {{ categoryInfo.icon }} {{ categoryInfo.label }}
+      </span>
 
       <h3>{{ post.title }}</h3>
 
@@ -51,12 +82,16 @@ function formatDate(date) {
   justify-content: space-between;
   align-items: center;
   gap: 24px;
+
   padding: 20px 22px;
+
   background: #fff;
   border: 1px solid #f1f3f5;
   border-radius: 15px;
+
   cursor: pointer;
   outline: none;
+
   transition: all 0.2s ease;
 }
 
@@ -74,32 +109,58 @@ function formatDate(date) {
 
 .post-badge {
   display: inline-block;
+
   margin-bottom: 9px;
   padding: 4px 9px;
+
   border-radius: 6px;
-  background: #e7f5ff;
-  color: #228be6;
+
   font-size: 11px;
   font-weight: 700;
+}
+
+/* 맛집 추천 */
+.post-badge.restaurant {
+  background: #fff4e6;
+  color: #f76707;
+}
+
+/* 관광지 추천 */
+.post-badge.tour {
+  background: #e7f5ff;
+  color: #228be6;
+}
+
+/* 자유게시판 */
+.post-badge.free {
+  background: #f1f3f5;
+  color: #495057;
 }
 
 h3 {
   margin: 0;
   overflow: hidden;
+
   color: #212529;
+
   font-size: 17px;
   font-weight: 750;
+
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .post-preview {
   display: -webkit-box;
+
   margin: 8px 0 0;
   overflow: hidden;
+
   color: #868e96;
+
   font-size: 14px;
   line-height: 1.55;
+
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
 }
@@ -109,12 +170,15 @@ h3 {
   align-items: center;
   gap: 14px;
   flex-shrink: 0;
+
   color: #adb5bd;
+
   font-size: 12px;
 }
 
 .arrow {
   color: #868e96;
+
   font-size: 26px;
   line-height: 1;
 }
