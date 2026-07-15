@@ -27,6 +27,18 @@ CREATE TABLE IF NOT EXISTS places (
     type TEXT  
 )
 """)
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS reviews (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        place_id INTEGER,
+        nickname TEXT NOT NULL,
+        password TEXT NOT NULL,
+        rating INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (place_id) REFERENCES places (id)
+    )
+    ''')
 conn.commit()
 
 # 3. 데이터를 넣는 헬퍼 함수 정의
