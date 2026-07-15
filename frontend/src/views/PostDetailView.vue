@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { getPost, getComments, deletePost } from '../api/post'
+import CommentList from '../components/post/CommentList.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -146,21 +147,5 @@ button {
   background: #e53935;
 
   color: white;
-}
-
-.comments {
-  margin-top: 40px;
-}
-
-.comment {
-  border-bottom: 1px solid #ddd;
-
-  padding: 15px 0;
-}
-
-.reply {
-  margin-left: 30px;
-
-  color: #666;
 }
 </style>
