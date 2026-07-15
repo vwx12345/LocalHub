@@ -48,7 +48,7 @@ const isOpen = ref(false)
   height: 60px; /* 헤더 높이 고정 */
   background-color: #ffffff;
   border-bottom: 1px solid #e0e0e0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   z-index: 1000; /* 지도보다 무조건 위에 있도록 설정 */
 }
 
