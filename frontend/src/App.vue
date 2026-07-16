@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import ChatBotButton from './components/chatbot/ChatBotButton.vue'
-import ChatBotWindow from './components/chatbot/ChatBotWindow.vue'
+import ChatBotWindow from './components/chatbot/ChatbotWindow.vue'
 import { RouterLink, RouterView } from 'vue-router'
 
 const isOpen = ref(false)
