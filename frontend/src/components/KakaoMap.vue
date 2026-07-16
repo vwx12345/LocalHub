@@ -303,7 +303,7 @@ const loadDataFromServer = async (type, keyword) => {
     selectedMarkerItem = null
     hideSelectedLabel()
 
-    const url = `http://localhost:8000/api/places?type=${type}&keyword=${keyword}`
+    const url = `/api/places?type=${type}&keyword=${keyword}`
     const response = await axios.get(url)
     const places = response.data
 
@@ -377,7 +377,7 @@ const clickRanking = async () => {
     hideSelectedLabel()
 
     // 타겟으로 설정된 타입 한 가지만 API 요청
-    const res = await axios.get(`http://localhost:8000/api/ranking?type=${targetType}`)
+    const res = await axios.get(`/api/ranking?type=${targetType}`)
     
     // 순위 데이터 매핑
     const rankedPlaces = res.data.map((p, i) => ({ ...p, rank: i + 1 }))
@@ -437,7 +437,7 @@ const clickRanking = async () => {
 
 const fetchReviews = async (placeId) => {
   try {
-    const res = await axios.get(`http://localhost:8000/api/places/${placeId}/reviews`)
+    const res = await axios.get(`/api/places/${placeId}/reviews`)
     reviews.value = res.data
   } catch (error) {
     console.error('❌ 리뷰 불러오기 실패:', error)
@@ -468,7 +468,7 @@ const submitReview = async () => {
   reviewForm.value = { nickname: '', password: '', rating: 5, content: '' }
 
   try {
-    await axios.post('http://localhost:8000/api/reviews', {
+    await axios.post('/api/reviews', {
       place_id: activePlace.value.id,
       nickname: formData.nickname,
       password: formData.password,
@@ -502,7 +502,7 @@ const submitEditReview = async (rev) => {
   }
 
   try {
-    await axios.put(`http://localhost:8000/api/reviews/${rev.id}`, {
+    await axios.put(`/api/reviews/${rev.id}`, {
       password: actionPassword.value,
       rating: Number(editForm.value.rating),
       content: editForm.value.content
@@ -533,7 +533,7 @@ const confirmDeleteReview = async (rev) => {
   }
 
   try {
-    await axios.delete(`http://localhost:8000/api/reviews/${rev.id}`, {
+    await axios.delete(`/api/reviews/${rev.id}`, {
       data: { password: actionPassword.value }
     })
 
