@@ -54,6 +54,7 @@ htmlcov/
 *.db
 *.sqlite
 *.sqlite3
+backend/app/create_board_tables.py
 
 # =========================
 # IDE
