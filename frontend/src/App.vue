@@ -11,7 +11,7 @@ const isOpen = ref(false)
   <div class="app-wrapper">
     <header class="top-nav">
       <RouterLink to="/" class="logo">
-        <h2>대충커뮤</h2>
+        <h2>LocalHub</h2>
       </RouterLink>
       <nav class="nav-links">
         <RouterLink to="/board">게시판(board)</RouterLink>
